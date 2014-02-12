@@ -1,4 +1,4 @@
-swmm5
+SWMM5 (version: 5.0.22)
 =====
 
 SWMM5 is public domain software by the EPA (www.epa.gov)
@@ -44,4 +44,7 @@ SWMM 5 was produced in a joint development effort with CDM, Inc., a global consu
 From the Repository owner:
 --------------------------
 
-The code in this repo is intended for compilation under linux systems. For other OS, pelase refer to the developer site at www.epa.gov for instructions.
+The code in this repo is intended for compilation under linux systems. For other OS, please refer to the developer site at www.epa.gov for instructions.
+
+Also note that this repo only includes the code for the computational engine and no graphical interface is supplied. CLI only!
+
