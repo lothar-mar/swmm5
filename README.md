@@ -39,3 +39,6 @@ The updated model allows engineers and planners to accurately represent any comb
 
 SWMM 5 was produced in a joint development effort with CDM, Inc., a global consulting, engineering, construction, and operations firm. 
 
+
+From the Repository owner:
+The code in this repo is intended for compilation under linux systems. For other OS, pelase refer to the developer site at www.epa.gov for instructions.

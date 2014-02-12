@@ -29,6 +29,7 @@
 //  Leave only one of the following 3 lines un-commented,
 //  depending on the choice of compilation target
 //**********************************************************
+// The following were changed to enable compilation under a linux environment (by lothar_m <lothar_m @ riseup.net>).
 #define CLE     /* Compile as a command line executable */                   //(5.0.014 - LR)
 //#define SOL     /* Compile as a shared object library */                     //(5.0.014 - LR)
 //#define DLL     /* Compile as a Windows DLL */                                 //(5.0.014 - LR)
