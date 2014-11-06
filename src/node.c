@@ -2,14 +2,9 @@
 //   node.c
 //
 //   Project:  EPA SWMM5
-//   Version:  5.0
-//   Date:     6/19/07   (Build 5.0.010)
-//             2/4/08    (Build 5.0.012)
-//             1/21/09   (Build 5.0.014)
-//             4/10/09   (Build 5.0.015)
-//             6/22/09   (Build 5.0.016)
-//             11/18/09  (Build 5.0.018)
-//             07/30/10  (Build 5.0.019)
+//   Version:  5.1
+//   Date:     03/20/14   (Build 5.1.001)
+//             09/15/14   (Build 5.1.007)
 //   Author:   L. Rossman
 //
 //   Conveyance system node functions.
@@ -23,10 +18,13 @@
 #include "findroot.h"
 
 //-----------------------------------------------------------------------------                  
-//  Shared variables
-//-----------------------------------------------------------------------------                  
-static int     Kstar;                  // storage unit index
-static double  Vstar;                  // storage unit volume (ft3)
+//  Local Declarations
+//-----------------------------------------------------------------------------
+typedef struct
+{
+    int     k;                  // storage unit index
+    double  v;                  // storage unit volume (ft3)
+} TStorageVol;
 
 //-----------------------------------------------------------------------------
 //  External functions (declared in funcs.h)
@@ -38,7 +36,7 @@ static double  Vstar;                  // storage unit volume (ft3)
 //  node_setOldQualState   (called from routing_execute)
 //  node_initInflow        (called from routing_execute)
 //  node_setOutletDepth    (called from routing_execute)
-//  node_getLosses         (called from removeLosses in routing.c)             //(5.0.015 - LR)
+//  node_getLosses         (called from flowroutc & dynwave.c)
 //  node_getSystemOutflow  (called from removeOutflows in routing.c)
 //  node_getResults        (called from output_saveNodeResults)
 //  node_getSurfArea
@@ -59,13 +57,12 @@ static int    outfall_readParams(int j, int k, char* tok[], int ntoks);
 static void   outfall_setOutletDepth(int j, double yNorm, double yCrit, double z);
 
 static int    storage_readParams(int j, int k, char* tok[], int ntoks);
-static int    storage_readInfilParams(int j, char* tok[], int ntoks, int n);   //(5.0.015 - LR)
 static double storage_getDepth(int j, double v);
 static double storage_getVolume(int j, double d);
 static double storage_getSurfArea(int j, double d);
-static void   storage_getVolDiff(double y, double* f, double* df);
+static void   storage_getVolDiff(double y, double* f, double* df, void* p);
 static double storage_getOutflow(int j, int i);
-static double storage_getLosses(int j, double tStep);                          //(5.0.019 - LR)
+static double storage_getLosses(int j, double tStep);
 
 static int    divider_readParams(int j, int k, char* tok[], int ntoks);
 static void   divider_validate(int j);
@@ -142,7 +139,7 @@ void  node_setParams(int j, int type, int k, double x[])
         Storage[k].aExpon  = x[4];
         Storage[k].aConst  = x[5];
         Storage[k].aCurve  = (int)x[6];
-        Node[j].pondedArea = x[7] / (UCF(LENGTH)*UCF(LENGTH));
+        // x[7] (ponded depth) is deprecated.                                  //(5.1.007)
         Storage[k].fEvap   = x[8];
         break;
 
@@ -170,17 +167,27 @@ void  node_validate(int j)
 //  Purpose: validates a node's properties.
 //
 {
-    // --- see if full depth was increased to accommodate conduit crown        //(5.0.014 - LR)
-    if ( Node[j].fullDepth > Node[j].oldDepth && Node[j].oldDepth > 0.0 )      //(5.0.014 - LR)
-    {                                                                          //(5.0.014 - LR)
-        report_writeWarningMsg(WARN02, Node[j].ID);                            //(5.0.015 - LR)
-    }                                                                          //(5.0.014 - LR)
+    TDwfInflow* inflow;
+
+    // --- see if full depth was increased to accommodate conduit crown
+    if ( Node[j].fullDepth > Node[j].oldDepth && Node[j].oldDepth > 0.0 )
+    {
+        report_writeWarningMsg(WARN02, Node[j].ID);
+    }
 
     // --- check that initial depth does not exceed max. depth
     if ( Node[j].initDepth > Node[j].fullDepth + Node[j].surDepth )
         report_writeErrorMsg(ERR_NODE_DEPTH, Node[j].ID);
 
     if ( Node[j].type == DIVIDER ) divider_validate(j);
+
+    // --- initialize dry weather inflows
+    inflow = Node[j].dwfInflow;
+    while (inflow)
+    {
+        inflow_initDwfInflow(inflow);
+        inflow = inflow->next;
+    }
 }
 
 //=============================================================================
@@ -192,16 +199,13 @@ void node_initState(int j)
 //  Purpose: initializes a node's state variables at start of simulation.
 //
 {
-    int p;
+    int p, k;                                                                  //(5.1.007)
 
     // --- initialize depth
     Node[j].oldDepth = Node[j].initDepth;
     Node[j].newDepth = Node[j].oldDepth;
     Node[j].crownElev = Node[j].invertElev;
 
-    // --- initialize volume
-//  Node[j].fullVolume = 0.0;                                                  //(5.0.014 - LR)
-//  Node[j].newVolume = 0.0;                                                   //(5.0.014 - LR)
     Node[j].fullVolume = node_getVolume(j, Node[j].fullDepth);
     Node[j].oldVolume = node_getVolume(j, Node[j].oldDepth);
     Node[j].newVolume = Node[j].oldVolume;
@@ -216,12 +220,19 @@ void node_initState(int j)
     // --- initialize any inflow
     Node[j].oldLatFlow = 0.0;
     Node[j].newLatFlow = 0.0;
+    Node[j].losses = 0.0;                                                      //(5.1.007)
 
-    // --- initialize HRT in storage nodes
+
+////  Following code section added to release 5.1.007.  ////                   //(5.1.007)
+    // --- initialize storage nodes
     if ( Node[j].type == STORAGE )
     {
-        Storage[Node[j].subIndex].hrt = 0.0;
-        grnampt_initState(Storage[Node[j].subIndex].infil);                    //(5.0.015 - LR)
+        // --- set hydraulic residence time to 0
+        k = Node[j].subIndex;
+        Storage[k].hrt = 0.0;
+
+        // --- initialize exfiltration properties
+        if ( Storage[k].exfil ) exfil_initState(k);
     }
 }
 
@@ -270,7 +281,7 @@ void node_initInflow(int j, double tStep)
     Node[j].oldFlowInflow = Node[j].inflow;
     Node[j].oldNetInflow  = Node[j].inflow - Node[j].outflow;
     Node[j].inflow = Node[j].newLatFlow;
-    Node[j].outflow = 0.0;
+    Node[j].outflow = Node[j].losses;                                          //(5.1.007)
 
     // --- set overflow to any excess stored volume
     if ( Node[j].newVolume > Node[j].fullVolume )
@@ -310,8 +321,8 @@ double node_getVolume(int j, double d)
       case STORAGE: return storage_getVolume(j, d);
 
       default:
-        if ( Node[j].fullDepth > 0.0 )                                         //(5.0.014 - LR)
-            return Node[j].fullVolume * (d / Node[j].fullDepth);               //(5.0.014 - LR)
+        if ( Node[j].fullDepth > 0.0 )
+            return Node[j].fullVolume * (d / Node[j].fullDepth);
         else return 0.0;
     }
 }
@@ -365,7 +376,7 @@ double node_getMaxOutflow(int j, double q, double tStep)
     double qMax;
     if ( Node[j].fullVolume > 0.0 )
     {
-        qMax = Node[j].inflow + Node[j].oldVolume / tStep;                     //(5.0.014 - LR)
+        qMax = Node[j].inflow + Node[j].oldVolume / tStep;
         if ( q > qMax ) q = qMax;
     }
     return MAX(0.0, q);
@@ -395,10 +406,15 @@ double node_getSystemOutflow(int j, int *isFlooded)
         // --- node sends flow into outfall conduit
         //     (therefore it has a negative outflow)
         else
-        {                                                                      //(5.0.015 - LR)
-            outflow = -Node[j].outflow;                      
-            Node[j].inflow = fabs(outflow);                                    //(5.0.015 - LR)
-        }                                                                      //(5.0.015 - LR)
+
+////  Following code segment modified for release 5.1.007.  ////               //(5.1.007)
+        {
+            if ( Node[j].inflow == 0.0 )
+            {
+                outflow = -Node[j].outflow;
+                Node[j].inflow = fabs(outflow);
+            }
+        }
 
         // --- set overflow and volume to 0
         Node[j].overflow = 0.0;
@@ -420,8 +436,8 @@ double node_getSystemOutflow(int j, int *isFlooded)
     //     overflow is considered as system outflow and flooding
     else 
     {
-        if ( Node[j].newVolume <= Node[j].fullVolume)                          //(5.0.012 - LR)
-            outflow = Node[j].overflow;                                        //(5.0.012 - LR)
+        if ( Node[j].newVolume <= Node[j].fullVolume)
+            outflow = Node[j].overflow;
         if ( outflow > 0.0 ) *isFlooded = TRUE;
     }
     return outflow;
@@ -454,7 +470,8 @@ void node_getResults(int j, double f, float x[])
     x[NODE_INFLOW] = (float)z;
     z = Node[j].overflow * UCF(FLOW);
     x[NODE_OVERFLOW] = (float)z;
-    for (p = 0; p < Nobjects[POLLUT]; p++)
+
+    if ( !IgnoreQuality ) for (p = 0; p < Nobjects[POLLUT]; p++)
     {
         z = f1*Node[j].oldQual[p] + f*Node[j].newQual[p];
         x[NODE_QUAL+p] = (float)z;
@@ -536,23 +553,24 @@ double node_getPondedArea(int j, double d)
     // --- compute ponded depth
     d = d - Node[j].fullDepth;
 
-    // --- use ponded area for flooded node                                    //(5.0.019 - LR)
-    a = Node[j].pondedArea;                                                    //(5.0.019 - LR)
+    // --- use ponded area for flooded node
+    a = Node[j].pondedArea;
     if ( a <= 0.0 ) a = node_getSurfArea(j, Node[j].fullDepth);
     return a;
 }
 
 //=============================================================================
 
-double node_getLosses(int j, double tStep)                                     //(5.0.019 - LR)
+double node_getLosses(int j, double tStep)
 //
 //  Input:   j = node index
-//           evap = system evaporation rate (ft/sec)
-//  Output:  returns evaporation rate at node (ft3)
-//  Purpose: computes node's volume lost to evaporation over a given time step.
+//           tStep = time step (sec)
+//  Output:  returns water loss rate at node (ft3)
+//  Purpose: computes the rates of evaporation and infiltration over a given
+//           time step for a node.
 //
 {
-    if ( Node[j].type == STORAGE ) return storage_getLosses(j, tStep);         //(5.0.019 - LR)
+    if ( Node[j].type == STORAGE ) return storage_getLosses(j, tStep);
     else return 0.0;
 }
 
@@ -619,8 +637,8 @@ int storage_readParams(int j, int k, char* tok[], int ntoks)
 //  Purpose: reads a storage unit's properties from a tokenized line of input.
 //
 //  Format of input line is:
-//     nodeID  elev  maxDepth  initDepth  FUNCTIONAL  a1  a2  a0  aPond  fEvap
-//     nodeID  elev  maxDepth  initDepth  TABULAR     curveID  aPond  fEvap
+//     nodeID  elev  maxDepth  initDepth  FUNCTIONAL a1 a2 a0 aPond fEvap (infil)
+//     nodeID  elev  maxDepth  initDepth  TABULAR    curveID  aPond fEvap (infil)
 //
 {
     int    i, m, n;
@@ -672,7 +690,7 @@ int storage_readParams(int j, int k, char* tok[], int ntoks)
         n = 6;
     }
 
-    // --- get ponded area if present 
+    // --- ignore next token if present (deprecated ponded area property)      //(5.1.007) 
     if ( ntoks > n)
     {
         if ( ! getDouble(tok[n], &x[7]) )
@@ -685,48 +703,15 @@ int storage_readParams(int j, int k, char* tok[], int ntoks)
     {
         if ( ! getDouble(tok[n], &x[8]) )
             return error_setInpError(ERR_NUMBER, tok[n]);
-        n++;                                                                   //(5.0.015 - LR)
+        n++;
     }
 
     // --- add parameters to storage unit object
     Node[j].ID = id;
     node_setParams(j, STORAGE, k, x);
 
-    // --- read infiltration parameters if present
-    if ( ntoks > n ) return storage_readInfilParams(j, tok, ntoks, n);         //(5.0.015 - LR)
-    return 0;
-}
-
-//=============================================================================
-
-////  New function added to release 5.0.015  ////                              //(5.0.015 - LR)
-
-int storage_readInfilParams(int j, char* tok[], int ntoks, int n)
-{
-    int       i, k;
-    double    x[3];
-    TGrnAmpt* infil;
-
-    // --- read Grenn-Ampt infiltration parameters from input tokens
-    if ( ntoks < n + 3 ) return error_setInpError(ERR_ITEMS, "");
-    for (i = 0; i < 3; i++)
-    {
-        if ( ! getDouble(tok[n+i], &x[i]) )
-            return error_setInpError(ERR_NUMBER, tok[n+i]);
-    }
-
-    // --- create a Green-Ampt infiltration object for the storage node
-    k = Node[j].subIndex;
-    infil = Storage[k].infil;
-    if ( infil == NULL )
-    {
-        infil = (TGrnAmpt *) malloc(sizeof(TGrnAmpt));
-        if ( infil == NULL ) return error_setInpError(ERR_MEMORY, "");
-        Storage[k].infil = infil;
-    }
-
-    // --- add the infiltration parameters to the Green-Ampt object
-    if ( !grnampt_setParams(infil, x) ) return error_setInpError(ERR_NUMBER, "");
+    // --- read exfiltration parameters if present
+    if ( ntoks > n ) return exfil_readStorageParams(k, tok, ntoks, n);         //(5.1.007)
     return 0;
 }
 
@@ -743,6 +728,7 @@ double storage_getDepth(int j, double v)
     int    k = Node[j].subIndex;
     int    i = Storage[k].aCurve;
     double d, e;
+	TStorageVol storageVol;
 
     // --- return max depth if a max. volume has been computed
     //     and volume is > max. volume
@@ -769,11 +755,11 @@ double storage_getDepth(int j, double v)
         }
         else
         {
-            Kstar = k;
-            Vstar = v;
+            storageVol.k = k;
+            storageVol.v = v;
             d = v / (Storage[k].aConst + Storage[k].aCoeff);
             findroot_Newton(0.0, Node[j].fullDepth*UCF(LENGTH), &d,
-                            0.001, storage_getVolDiff);            
+                            0.001, storage_getVolDiff, &storageVol);            
         }
         d /= UCF(LENGTH);
         if ( d > Node[j].fullDepth ) d = Node[j].fullDepth;
@@ -783,7 +769,7 @@ double storage_getDepth(int j, double v)
 
 //=============================================================================
 
-void  storage_getVolDiff(double y, double* f, double* df)
+void  storage_getVolDiff(double y, double* f, double* df, void* p)
 //
 //  Input:   y = depth of water (ft)
 //  Output:  f = volume of water (ft3)
@@ -792,11 +778,22 @@ void  storage_getVolDiff(double y, double* f, double* df)
 //           at storage node Kstar using the node's area versus depth function.
 //
 {
-    double e = Storage[Kstar].aExpon + 1.0;
-    double v = Storage[Kstar].aConst * y + Storage[Kstar].aCoeff /
-               e * pow(y, e);
-    *f = v - Vstar;
-    *df = Storage[Kstar].aConst + Storage[Kstar].aCoeff * pow(y, e-1.0);
+	int    k;
+	double e, v;
+	TStorageVol* storageVol;
+		
+	// ... cast void pointer p to a TStorageVol object
+	storageVol = (TStorageVol *)p;
+	k = storageVol->k;
+
+	// ... find storage volume at depth y
+    e = Storage[k].aExpon + 1.0;
+    v = Storage[k].aConst * y + Storage[k].aCoeff / e * pow(y, e);
+
+	// ... compute difference between this volume and target volume
+	//     as well as its derivative w.r.t. y
+	*f = v - storageVol->v;
+	*df = Storage[k].aConst + Storage[k].aCoeff * pow(y, e-1.0);
 }
 
 //=============================================================================
@@ -815,20 +812,13 @@ double storage_getVolume(int j, double d)
 
     // --- return full volume if depth >= max. depth
     if ( d == 0.0 ) return 0.0;
-    if ( d >= Node[j].fullDepth                                                //(5.0.016 - LR)
+    if ( d >= Node[j].fullDepth
     &&   Node[j].fullVolume > 0.0 ) return Node[j].fullVolume;
 
     // --- use table integration if area v. depth table exists
     if ( i >= 0 )
-        return table_getArea(&Curve[i], d*UCF(LENGTH)) / UCF(VOLUME);          //(5.0.010 - LR)
-/*
-    {
-        v = table_getArea(&Curve[i], d*UCF(LENGTH)) / UCF(VOLUME);
-        if ( v  < 1.e-6 ) return 0.0;
-        if ( Node[j].fullVolume > 0.0 ) v = MIN(v, Node[j].fullVolume);
-        return v;
-    }
-*/
+        return table_getArea(&Curve[i], d*UCF(LENGTH)) / UCF(VOLUME);
+
     // --- otherwise use functional area v. depth relation
     else
     {
@@ -857,10 +847,11 @@ double storage_getSurfArea(int j, double d)
         area = table_lookupEx(&Curve[i], d*UCF(LENGTH));
     else
     {
-        if ( Storage[k].aExpon == 0.0 )
+		if ( Storage[k].aCoeff <= 0.0 ) area = Storage[k].aConst;
+        else if ( Storage[k].aExpon == 0.0 )
             area = Storage[k].aConst + Storage[k].aCoeff;
         else area = Storage[k].aConst + Storage[k].aCoeff *
-                    pow(Node[j].newDepth*UCF(LENGTH), Storage[k].aExpon);
+                    pow(d*UCF(LENGTH), Storage[k].aExpon);
     }
     return area / UCF(LENGTH) / UCF(LENGTH);
 }
@@ -883,7 +874,7 @@ double storage_getOutflow(int j, int i)
     if ( Link[i].type != CONDUIT ) return 0.0;
 
     // --- find depth of water in conduit
-    y = Node[j].newDepth - Link[i].offset1;                                    //(5.0.012 - LR)
+    y = Node[j].newDepth - Link[i].offset1;
 
     // --- return 0 if conduit empty or full flow if full
     if ( y <= 0.0 ) return 0.0;
@@ -897,78 +888,65 @@ double storage_getOutflow(int j, int i)
 
 //=============================================================================
 
-//  This function was re-written for release 5.0.019.  ////                    (5.0.019 - LR)
+////  This function was re-written for release 5.1.007.  ////                  //(5.1.007)
 
 double storage_getLosses(int j, double tStep)
 //
 //  Input:   j = node index
 //           tStep = time step (sec)
-//  Output:  returns volume of water evaporated & infiltrated (ft3)
-//  Purpose: computes volume of water evaporated & infiltrated from a storage
-//           node over a given time step.
+//  Output:  returns evaporation + infiltration rate (cfs)
+//  Purpose: computes combined rate of water evaporated & infiltrated from
+//           a storage node.
 //
 {
+	int    k;
     double depth;
-    double area = 0.0;
-    double area0 = 0.0;
+    double area;
     double evapRate;
-    double evapLoss = 0.0;
-    double infilLoss = 0.0;
+    double exfilRate = 0.0;
     double totalLoss = 0.0;
-    double maxLoss;
-    TGrnAmpt* infil;
+    double lossRatio;
+    TExfil* exfil;
 
-    // --- adjust evaporation rate for storage unit's evaporation potential
-    evapRate = Evap.rate * Storage[Node[j].subIndex].fEvap;
-    if ( evapRate > 0.0 )
+    // --- get evap. rate & infil. object
+    k = Node[j].subIndex;
+    evapRate = Evap.rate * Storage[k].fEvap;
+    exfil = Storage[k].exfil;
+    if ( evapRate > 0.0 || exfil != NULL )
     {
         // --- find surface area available for evaporation
         depth = Node[j].oldDepth;
-        if ( depth > FUDGE ) area += storage_getSurfArea(j, depth);
-        depth = Node[j].newDepth;
-        if ( depth > FUDGE ) area += storage_getSurfArea(j, depth);
+        area = storage_getSurfArea(j, depth);
 
-        // --- compute evaporation loss over average area
-        evapLoss = 0.5 * area * evapRate * tStep;
-    }
+        // --- compute evap rate over this area
+        evapRate = area * evapRate;
 
-    // --- compute infiltration loss
-    infil = Storage[Node[j].subIndex].infil;
-    if (infil)
-    {
-        // --- find average depth over time step
-        depth = 0.5 * (Node[j].oldDepth + Node[j].newDepth);
-
-        // --- get surface area at avg. depth and at bottom of unit
-        area0 = storage_getSurfArea(j, 0.0);
-        area = area0;
-        if ( depth > FUDGE ) area = storage_getSurfArea(j, depth);
-        if ( area > 0.0 )
-        {
-            // --- get average depth assuming sloped sides
-            depth = depth / 2.0 * (1.0 + area0/area);
-
-            // --- compute infil. loss considering ponded depth
-            infilLoss = grnampt_getInfil(infil, tStep, 0.0, depth) *
-                        area * tStep;
+		// --- compute infiltration rate through bottom and side banks
+		if ( exfil != NULL )
+		{
+            exfilRate = exfil_getLoss(exfil, tStep, depth, area);
         }
-    }
+     }
 
-    // --- compute total loss
-    totalLoss = evapLoss + infilLoss;
-    maxLoss = 0.5 * (Node[j].oldVolume + Node[j].newVolume);
+    // --- total loss over time step cannot exceed stored volume
+    totalLoss = (evapRate + exfilRate) * tStep;
     if ( totalLoss > 0.0 )
     {
-        if ( totalLoss > maxLoss )
+        lossRatio = Node[j].oldVolume / totalLoss;
+        if ( lossRatio < 1.0 )
         {
-            evapLoss = (evapLoss / totalLoss) * maxLoss;
-            totalLoss = maxLoss;
+            evapRate *= lossRatio;
+            exfilRate *= lossRatio; 
+            totalLoss *= lossRatio;
         }
     }
-    Storage[Node[j].subIndex].evapLoss = evapLoss;
-    Storage[Node[j].subIndex].losses = totalLoss;
-    return totalLoss;
+
+    // --- save evap & infil losses at the node
+    Storage[Node[j].subIndex].evapLoss = evapRate * tStep;
+    Storage[Node[j].subIndex].exfilLoss = exfilRate * tStep;
+    return evapRate + exfilRate;
 }
+
 
 //=============================================================================
 //                   D I V I D E R   M E T H O D S
@@ -1089,7 +1067,7 @@ void  divider_validate(int j)
     // --- check that diverted link is attached to divider
     k = Node[j].subIndex;
     i = Divider[k].link;
-    if ( i < 0 || ( Link[i].node1 != j && Link[i].node2 != j) )                //(5.0.010 - LAR)
+    if ( i < 0 || ( Link[i].node1 != j && Link[i].node2 != j) )
     {
         report_writeErrorMsg(ERR_DIVIDER_LINK, Node[j].ID);
     }
@@ -1248,7 +1226,7 @@ int outfall_readParams(int j, int k, char* tok[], int ntoks)
           m = project_findObject(TSERIES, tok[3]);            
           if ( m < 0 ) return error_setInpError(ERR_NAME, tok[3]);
           x[4] = m;
-          Tseries[m].refersTo = TIMESERIES_OUTFALL;                            //(5.0.019 - LR)
+          Tseries[m].refersTo = TIMESERIES_OUTFALL;
         }
     }
     if ( ntoks == n )
@@ -1302,13 +1280,13 @@ void outfall_setOutletDepth(int j, double yNorm, double yCrit, double z)
         table_getFirstEntry(&Curve[k], &x, &y);
         currentDate = NewRoutingTime / MSECperDAY;
         x += ( currentDate - floor(currentDate) ) * 24.0;
-        stage = table_lookup(&Curve[k], x) / UCF(LENGTH);                      //(5.0.012 - LR)
+        stage = table_lookup(&Curve[k], x) / UCF(LENGTH);
         break;
 
       case TIMESERIES_OUTFALL:
         k = Outfall[i].stageSeries;
         currentDate = StartDateTime + NewRoutingTime / MSECperDAY;
-        stage = table_tseriesLookup(&Tseries[k], currentDate, TRUE) /          //(5.0.012 - LR)
+        stage = table_tseriesLookup(&Tseries[k], currentDate, TRUE) /
                 UCF(LENGTH);
         break;
       default: stage = Node[j].invertElev;

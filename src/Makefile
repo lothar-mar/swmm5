@@ -1,11 +1,11 @@
 # Makefile for SWMM5
 
-objs = swmm5.o climate.o controls.o culvert.o datetime.o dynwave.o error.o findroot.o \
-       flowrout.o forcmain.o gage.o gwater.o hash.o iface.o infil.o inflow.o \
-       input.o inputrpt.o keywords.o kinwave.o landuse.o lid.o link.o massbal.o \
-       mathexpr.o mempool.o node.o odesolve.o output.o project.o qualrout.o \
-       rain.o rdii.o report.o routing.o runoff.o shape.o snow.o stats.o \
-       statsrpt.o subcatch.o table.o toposort.o transect.o treatmnt.o xsect.o
+objs = swmm5.o climate.o controls.o culvert.o datetime.o dwflow.o dynwave.o error.o \
+       exfil.o \findroot.o flowrout.o forcmain.o gage.o gwater.o hash.o hotstart.o iface.o \
+       infil.o inflow.o input.o inputrpt.o keywords.o kinwave.o landuse.o lid.o \
+       lidproc.o link.o massbal.o mathexpr.o mempool.o node.o odesolve.o output.o \
+       project.o qualrout.o rain.o rdii.o report.o routing.o runoff.o shape.o snow.o \
+       stats.o \ statsrpt.o subcatch.o table.o toposort.o transect.o treatmnt.o xsect.o
 
 
 swmm5 : $(objs)
@@ -16,14 +16,17 @@ climate.o     : headers.h
 controls.o    : headers.h
 culvert.o     : headers.h
 datetime.o    : datetime.h
+dwflow.o      : headers.h
 dynwave.o     : headers.h
 error.o       : error.h
+exfil.o       : headers.h infil.h exfil.h
 findroot.o    : findroot.h
 flowrout.o    : headers.h
 forcmain.o    : headers.h
 gage.o        : headers.h
 gwater.o      : headers.h odesolve.h
 hash.o        : hash.h
+hotstart      : headers.h
 iface.o       : headers.h
 infil.o       : headers.h infil.h
 inflow.o      : headers.h
@@ -33,6 +36,7 @@ keywords.o    : text.h
 kinwave.o     : headers.h findroot.h
 landuse.o     : headers.h
 lid.o         : headers.h infil.h lid.h
+lidproc.o     : headers.h lid.h
 link.o        : headers.h
 massbal.o     : headers.h
 mathexpr.o    : mathexpr.h
@@ -57,3 +61,4 @@ toposort.o    : headers.h
 transect.o    : headers.h
 treatmnt.o    : headers.h
 xsect.o       : headers.h findroot.h
+

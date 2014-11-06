@@ -1,7 +1,7 @@
 A Roadmap to the SWMM 5 Engine Source Code
 ==========================================
 
-The SWMM 5 computational engine consists of 43 C-code files plus several
+The SWMM 5 computational engine consists of 50 C-code files plus several
 header files. The engine can be compiled either as a Dynamic Link Library
 (DLL) under Windows or as a stand-alone console application under both
 Windows and Linux, depending on which of the #define DLL and #define CLE
@@ -51,12 +51,16 @@ stats.c       collects summary statistics on flow rates, water depths,
               solution iterations, and variable time steps for a
 	      simulation.
 
+statsrpt.c    writes summary simulation results to a status report.
+
 output.c      writes/reads runoff and routing results to/from a binary
               output file.
 
 report.c      prepares a status report of simulation results and, for the
               command line version of SWMM 5, reports complete results for
 	      selected subcatchments, nodes, and links.
+
+inputrpt.c    writes a summary of a project's input data to the status report.
 
 -------------------------------------------------------------------------------
 
@@ -88,6 +92,8 @@ landuse.c     evaluates pollutant buildup and washoff functions for a project's
 lid.c         evaluates the hydrologic performance of Low Impact Development
               practices utilized within subcatchment areas.              
 
+lidproc.c     computes the hydrologic performance of individual LID units.
+
 -------------------------------------------------------------------------------
 
 These modules are used for flow and water quality routing:
@@ -107,6 +113,9 @@ kinwave.c      performs kinematic wave flow routing calculations at each time
 
 dynwave.c      performs dynamic wave flow routing calculations at each time
                step of the simulation
+
+dwflow.c       solves the dynamic wave flow continuity and momentum equations in
+               a single conduit over a single time step.
 
 controls.c     implements rule-based control actions on pumps and regulators
                as the simulation unfolds.
@@ -130,6 +139,11 @@ forcmain.c     computes friction losses in force mains that use either the
                Hazen-Williams or Darcy-Weisbach equations in place of the
                Manning equation for pressurized flow.
 
+culvert.c      computes flow reduction in culvert-type conduits due to
+               inlet control using equations from the FHWA HEC-5 circular.
+
+exfil.c        computes exfiltration from beneath storage units.
+
 -------------------------------------------------------------------------------
 
 The following modules provide various support functions for SWMM 5:
@@ -142,6 +156,9 @@ findroot.c     equation root finding functions.
 
 hash.c         functions that implement hash tables for fast object retrieval.
 
+hotstart.c     saves or reads the state of the drainage system to or from a
+               hot start file.
+
 iface.c        functions for reading from and writing to routing interface
                files.
 
@@ -149,7 +166,8 @@ keywords.c     defines lists of keywords that appear as part of a SWMM 5
                input file.
 
 mathexpr.c     functions that parse and evaluate user-supplied mathematical
-               expressions for pollutant removal at treatment nodes.
+               expressions for pollutant removal at treatment nodes and for
+               groundwater outflow from subcatchments.
 
 mempool.c      functions that provide a memory pool used to store object
                ID names.
