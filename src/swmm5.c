@@ -40,7 +40,7 @@
 #include <excpt.h>
 #endif
 
-#include <direct.h>
+//#include <direct.h>	commented out. seems to prevent compiling with gcc.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
