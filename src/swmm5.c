@@ -41,6 +41,7 @@
 #endif
 
 //#include <direct.h>	commented out. seems to prevent compiling with gcc.
+#include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
