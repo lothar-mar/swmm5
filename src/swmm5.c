@@ -714,7 +714,7 @@ char* getTempFileName(char* fname)
 
     // --- use system function mkstemp() to create a temporary file name
     strcpy(fname, "swmmXXXXXX");
-    int mkstemp(fname);
+    int mkstemp(char* fname);
     return fname;
 
 #endif
