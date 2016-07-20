@@ -4,13 +4,18 @@
 //   Project: EPA SWMM5
 //   Version: 5.1
 //   Date:    03/20/14  (Build 5.1.001)
+//            03/19/15  (Build 5.1.008)
+//            08/05/15  (Build 5.1.010)
 //   Author:  L. Rossman
 //
 //   Error messages
 //
-//   NOTE: The error message listings were re-ordered sequentially for
-//         release 5.0.023 and all previous update comments were removed.
-
+//   Build 5.1.008:
+//   - Text of Error 217 for control rules modified.
+//
+//   Build 5.1.010:
+//   - Text of Error 318 for rainfall data files modified.
+//
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
@@ -97,7 +102,7 @@
 #define ERR209 "\n  ERROR 209: undefined object %s "
 #define ERR211 "\n  ERROR 211: invalid number %s "
 #define ERR213 "\n  ERROR 213: invalid date/time %s "
-#define ERR217 "\n  ERROR 217: control rule clause out of sequence "
+#define ERR217 "\n  ERROR 217: control rule clause invalid or out of sequence "  //(5.1.008)
 #define ERR219 "\n  ERROR 219: data provided for unidentified transect "
 #define ERR221 "\n  ERROR 221: transect station out of sequence "
 #define ERR223 "\n  ERROR 223: Transect %s has too few stations." 
@@ -117,7 +122,8 @@
 #define ERR313 "\n  ERROR 313: cannot open scratch rainfall interface file."
 #define ERR315 "\n  ERROR 315: cannot open rainfall interface file %s."
 #define ERR317 "\n  ERROR 317: cannot open rainfall data file %s."
-#define ERR318 "\n  ERROR 318: date out of sequence in rainfall data file %s."
+#define ERR318 \
+"\n  ERROR 318: the following line is out of sequence in rainfall data file %s." //(5.1.010)
 #define ERR319 "\n  ERROR 319: unknown format for rainfall data file %s."
 #define ERR320 "\n  ERROR 320: invalid format for rainfall interface file."
 #define ERR321 "\n  ERROR 321: no data in rainfall interface file for gage %s."
@@ -161,7 +167,6 @@
 #define ERR405 \
 "\n  ERROR 405: amount of output produced will exceed maximum file size;" \
 "\n             either reduce Ending Date or increase Reporting Time Step."
-
 
 ////////////////////////////////////////////////////////////////////////////
 //  NOTE: Need to update ErrorMsgs[], ErrorCodes[], and ErrorType
