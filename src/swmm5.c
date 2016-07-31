@@ -711,7 +711,7 @@ int  strcomp(char *s1, char *s2)
 
 //=============================================================================
 
-char* getTempFileName(char* fname)
+char* getTempFileName(char *fname)
 //
 //  Input:   fname = file name string (with max size of MAXFNAME)
 //  Output:  returns pointer to file name
