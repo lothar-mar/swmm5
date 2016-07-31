@@ -4,6 +4,7 @@
 //   Project:  EPA SWMM5
 //   Version:  5.1
 //   Date:     03/19/14  (Build 5.1.001)
+//             03/19/15  (Build 5.1.008)
 //   Author:   L. Rossman
 //
 //   This is the main module of the computational engine for Version 5 of
@@ -14,6 +15,13 @@
 //   a command line executable or through a series of calls made to functions
 //   in a dynamic link library.
 //
+//
+//   Build 5.1.008:
+//   - Support added for the MinGW compiler.
+//   - Reporting of project options moved to swmm_start. 
+//   - Hot start file now read before routing system opened.
+//   - Final routing step adjusted so that total duration not exceeded.
+//
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
@@ -23,7 +31,7 @@
 //**********************************************************
 #define CLE     /* Compile as a command line executable */
 //#define SOL     /* Compile as a shared object library */
-//#define DLL     /* Compile as a Windows DLL */
+//define DLL     /* Compile as a Windows DLL */
 
 // --- define WINDOWS
 #undef WINDOWS
@@ -34,11 +42,25 @@
   #define WINDOWS
 #endif
 
-// --- headers for exception handling
+////  ---- following section modified for release 5.1.008.  ////               //(5.1.008)
+////
+// --- define EXH (MS Windows exception handling)
+#undef MINGW       // indicates if MinGW compiler used
+#undef EXH         // indicates if exception handling included
 #ifdef WINDOWS
-#include <windows.h>
-#include <excpt.h>
+  #ifndef MINGW
+    #define EXH
+  #endif
 #endif
+
+// --- include Windows & exception handling headers
+#ifdef WINDOWS
+  #include <windows.h>
+#endif
+#ifdef EXH
+  #include <excpt.h>
+#endif
+////
 
 //#include <direct.h>	commented out. seems to prevent compiling with gcc.
 //#include <unistd.h>
@@ -287,7 +309,6 @@ int DLLEXPORT swmm_open(char* f1, char* f2, char* f3)
         // --- write project title to report file & validate data
         report_writeTitle();
         project_validate();
-	    report_writeOptions();
 
         // --- write input summary to report file if requested
         if ( RptFlags.input ) inputrpt_writeInput();
@@ -354,25 +375,28 @@ int DLLEXPORT swmm_start(int saveResults)
         if ( Nobjects[NODE] > 0 && !IgnoreRouting ) DoRouting = TRUE;
         else DoRouting = FALSE;
 
-        // --- open all computing systems (order is important!)
+////  Following section modified for release 5.1.008.  ////                    //(5.1.008)
+////
+        // --- open binary output file
         output_open();
+
+        // --- open runoff processor
         if ( DoRunoff ) runoff_open();
-        if ( DoRouting ) routing_open();
+
+        // --- open & read hot start file if present
         if ( !hotstart_open() ) return ErrorCode;
 
-        // --- initialize flow and quality routing 
-        if ( DoRouting )
-        {	
-            flowrout_init(RouteModel);
-            qualrout_init();
-        }
+        // --- open routing processor
+        if ( DoRouting ) routing_open();
 
-        // --- initialize mass balance and statistics processors
+        // --- open mass balance and statistics processors
         massbal_open();
         stats_open();
 
-        // --- write Control Actions heading to report file
+        // --- write project options to report file 
+	    report_writeOptions();
         if ( RptFlags.controls ) report_writeControlActionsHeading();
+////
     }
 
 #ifdef WINDOWS
@@ -474,6 +498,17 @@ void execRouting(DateTime elapsedTime)
         }
         nextRoutingTime = NewRoutingTime + 1000.0 * routingStep;
 
+////  Following section added to release 5.1.008.  ////                        //(5.1.008)
+////
+        // --- adjust routing step so that total duration not exceeded
+        if ( nextRoutingTime > TotalDuration )
+        {
+            routingStep = (TotalDuration - NewRoutingTime) / 1000.0;
+            routingStep = MAX(routingStep, 1./1000.0);
+            nextRoutingTime = TotalDuration;
+        }
+////
+
         // --- compute runoff until next routing time reached or exceeded
         if ( DoRunoff ) while ( NewRunoffTime < nextRoutingTime )
         {
@@ -484,7 +519,8 @@ void execRouting(DateTime elapsedTime)
         // --- if no runoff analysis, update climate state (for evaporation)
         else climate_setState(getDateTime(NewRoutingTime));
   
-        // --- route flows through drainage system over current time step
+        // --- route flows & pollutants through drainage system                //(5.1.008)
+        //     (while updating NewRoutingTime)                                 //(5.1.008)
         if ( DoRouting ) routing_execute(RouteModel, routingStep);
         else NewRoutingTime = nextRoutingTime;
     }
@@ -692,7 +728,7 @@ char* getTempFileName(char* fname)
     if (strlen(TempDir) > 0)
     {
         _mkdir(TempDir);
-	    dir = TempDir;
+        dir = TempDir;
     }
 
     // --- use _tempnam to get a pointer to an unused file name
