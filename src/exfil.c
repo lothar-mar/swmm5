@@ -4,9 +4,16 @@
 //   Project:  EPA SWMM5
 //   Version:  5.1
 //   Date:     09/15/14  (Build 5.1.007)
+//             03/19/15  (Build 5.1.008)
+//             08/05/15  (Build 5.1.010)
 //   Author:   L. Rossman
 //
-//   Exfiltration functions.
+//   Storage unit exfiltration functions.
+//
+//   Build 5.1.008:
+//   - Monthly conductivity adjustment applied to exfiltration rate.
+//   Build 5.1.010:
+//   - New modified Green-Ampt infiltration option used.
 //
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
@@ -136,8 +143,12 @@ double exfil_getLoss(TExfil* exfil, double tStep, double depth, double area)
     double exfilRate = 0.0;
 
     // --- find infiltration through bottom of unit
-    if ( exfil->btmExfil->IMDmax == 0.0 ) exfilRate = exfil->btmExfil->Ks;
-    else exfilRate = grnampt_getInfil(exfil->btmExfil, tStep, 0.0, depth);
+    if ( exfil->btmExfil->IMDmax == 0.0 )
+    {
+        exfilRate = exfil->btmExfil->Ks * Adjust.hydconFactor;                 //(5.1.008)
+    }
+    else exfilRate = grnampt_getInfil(exfil->btmExfil, tStep, 0.0, depth,
+                                      MOD_GREEN_AMPT);                         //(5.1.010)
     exfilRate *= exfil->btmArea;
 
     // --- find infiltration through sloped banks
@@ -150,7 +161,7 @@ double exfil_getLoss(TExfil* exfil, double tStep, double depth, double area)
             // --- if infil. rate not a function of depth
             if ( exfil->btmExfil->IMDmax == 0.0 )
             {    
-                exfilRate += area * exfil->btmExfil->Ks;
+                exfilRate += area * exfil->btmExfil->Ks * Adjust.hydconFactor; //(5.1.008)
             }
 
             // --- infil. rate depends on depth above bank
@@ -169,7 +180,7 @@ double exfil_getLoss(TExfil* exfil, double tStep, double depth, double area)
 
                 // --- use Green-Ampt function for bank infiltration
                 exfilRate += area * grnampt_getInfil(exfil->bankExfil,
-                                    tStep, 0.0, depth);
+                                    tStep, 0.0, depth, MOD_GREEN_AMPT);        //(5.1.010)
             }
         }
     }
@@ -184,6 +195,8 @@ int  createStorageExfil(int k, double x[])
 //           x = array of Green-Ampt infiltration parameters
 //  Output:  returns an error code.
 //  Purpose: creates an exfiltration object for a storage node.
+//
+//  Note: the exfiltration object is freed in project.c.
 //
 {
     TExfil*   exfil;
