@@ -4,13 +4,8 @@ objs = swmm5.o climate.o controls.o culvert.o datetime.o dwflow.o dynwave.o erro
        exfil.o findroot.o flowrout.o forcmain.o gage.o gwater.o hash.o hotstart.o iface.o \
        infil.o inflow.o input.o inputrpt.o keywords.o kinwave.o landuse.o lid.o \
        lidproc.o link.o massbal.o mathexpr.o mempool.o node.o odesolve.o output.o \
-<<<<<<< HEAD
-       project.o qualrout.o rain.o rdii.o report.o routing.o runoff.o shape.o snow.o \
-       stats.o statsrpt.o subcatch.o table.o toposort.o transect.o treatmnt.o xsect.o
-=======
        project.o qualrout.o rain.o rdii.o report.o roadway.o routing.o runoff.o shape.o snow.o \
        stats.o statsrpt.o subcatch.o surfqual.o table.o toposort.o transect.o treatmnt.o xsect.o
->>>>>>> 956918cc8e4d966d4e359a0b9f3f0fde9a47f2c4
 
 
 swmm5 : $(objs)
