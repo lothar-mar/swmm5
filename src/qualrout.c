@@ -498,13 +498,6 @@ double getLinkLosses(int i, double tStep)
         v1 = Link[i].oldVolume - seepRate * tStep;    // after seepage
         v2 = v1 - evapRate * tStep;                   // after seepage & evap
 
-<<<<<<< HEAD
-        // --- no volume remaining; send remaining mass to final storage
-        if ( v2 < FUDGE )
-        {
-            for (p = 0; p < Nobjects[POLLUT]; p++)
-                massbal_addToFinalStorage(p, Link[i].oldQual[p] * v1);
-=======
         // --- consuit is dry; send any remaining mass to final storage        //(5.1.009)
         if ( Link[i].newDepth <= ZeroDepth )                                   //(5.1.009)
         {
@@ -513,7 +506,6 @@ double getLinkLosses(int i, double tStep)
                 massbal_addToFinalStorage(p, Link[i].oldQual[p] * v1);
                 Link[i].oldQual[p] = 0.0;                                      //(5.1.009)
             }
->>>>>>> v5.1.009
         }
         // --- otherwise increase concentrations by loss in volume
         else
