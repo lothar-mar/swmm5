@@ -6,7 +6,6 @@
 //   Date:    03/20/10 (Build 5.1.001)
 //            09/15/14 (Build 5.1.007)
 //            03/19/15 (Build 5.1.008)
-//            08/05/15 (Build 5.1.010)
 //   Author:  L. Rossman
 //
 //   Climate related functions.
@@ -20,9 +19,6 @@
 //   - Time series evaporation rates can now vary within a day.
 //   - Evaporation rates are now properly updated when only flow routing
 //     is being simulated.
-//
-//   Build 5.1.010:
-//   - Hargreaves evaporation now computed using 7-day average temperatures.
 //             
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
@@ -50,22 +46,6 @@ enum   WindSpeedType  {WDMV, AWND};                                            /
 static char* ClimateVarWords[] = {"TMIN", "TMAX", "EVAP", "WDMV", "AWND",      //(5.1.007)
                                   NULL};
 
-////  Added for release 5.1.010.  ////                                         //(5.1.010)
-//-----------------------------------------------------------------------------
-//  Data Structures
-//-----------------------------------------------------------------------------
-typedef struct
-{
-    double    tAve;          // moving avg. for daily temperature (deg F)
-    double    tRng;          // moving avg. for daily temp. range (deg F)
-    double    ta[7];         // data window for tAve
-    double    tr[7];         // data window for tRng
-    int       count;         // length of moving average window
-    int       maxCount;      // maximum length of moving average window
-    int       front;         // index of front of moving average window
-} TMovAve;
-////
-
 //-----------------------------------------------------------------------------
 //  Shared variables
 //-----------------------------------------------------------------------------
@@ -81,7 +61,6 @@ static double    Hrday;                // avg. of min/max temp times
 static double    Dhrdy;                // hrs. between min. & max. temp. times
 static double    Dydif;                // hrs. between max. & min. temp. times
 static DateTime  LastDay;              // date of last day with temp. data
-static TMovAve   Tma;                  // moving average of daily temperatures //(5.1.010)
 
 // Evaporation variables
 static DateTime  NextEvapDate;         // next date when evap. rate changes
@@ -128,8 +107,7 @@ static void setEvap(DateTime theDate);
 static void setTemp(DateTime theDate);
 static void setWind(DateTime theDate);
 static void updateTempTimes(int day);
-static void updateTempMoveAve(double tmin, double tmax);                       //(5.1.010)
-static double getTempEvap(int day, double ta, double tr);                      //(5.1.010)
+static double getTempEvap(int day);
 
 static void updateFileValues(DateTime theDate);
 static void parseUserFileLine(void);
@@ -572,18 +550,6 @@ void climate_initState()
         // --- find the next time evaporation rates change after this
         setNextEvapDate(NextEvapDate); 
     }
-
-////  Following section added to release 5.1.010.  ////                        //(5.1.010)
-    // --- initialize variables for temperature evaporation
-    if ( Evap.type == TEMPERATURE_EVAP )
-    {
-        Tma.maxCount = sizeof(Tma.ta) / sizeof(double);
-        Tma.count = 0;
-        Tma.front = 0;
-        Tma.tAve = 0.0;
-        Tma.tRng = 0.0;
-    }
-////
 }
 
 //=============================================================================
@@ -767,10 +733,7 @@ void setTemp(DateTime theDate)
             }
             updateTempTimes(day);
             if ( Evap.type == TEMPERATURE_EVAP )
-            {
-                updateTempMoveAve(Tmin, Tmax);                                 //(5.1.010)
-                FileValue[EVAP] = getTempEvap(day, Tma.tAve, Tma.tRng);        //(5.1.010)
-            }
+                FileValue[EVAP] = getTempEvap(day);
         }
 
         // --- compute snow melt coefficients based on day of year
@@ -932,21 +895,17 @@ void updateTempTimes(int day)
 
 //=============================================================================
 
-////  This function was modified for release 5.1.010.  ////                    //(5.1.010)
-
-double getTempEvap(int day, double tave, double trng)
+double getTempEvap(int day)
 //
 //  Input:   day = day of year
-//           tave = 7-day average temperature (deg F)
-//           trng = 7-day average daily temperature range (deg F)
-//  Output:  returns evaporation rate in user's units (US:in/day, SI:mm/day)
+//  Output:  returns evaporation rate in in/day
 //  Purpose: uses Hargreaves method to compute daily evaporation rate
-//           from daily average temperatures and Julian day.
+//           from daily min/max temperatures and Julian day.
 //
 {
     double a = 2.0*PI/365.0;
-    double ta = (tave - 32.0)*5.0/9.0;           //average temperature (deg C)
-    double tr = trng*5.0/9.0;                    //temperature range (deg C)
+    double ta = (Tave - 32.0)*5.0/9.0;           //average temperature (deg C)
+    double tr = (Tmax - Tmin)*5.0/9.0;           //temperature range (deg C)
     double lamda = 2.50 - 0.002361 * ta;         //latent heat of vaporization
     double dr = 1.0 + 0.033*cos(a*day);          //relative earth-sun distance
     double phi = Temp.anglat*2.0*PI/360.0;       //latitude angle (rad)
@@ -957,7 +916,7 @@ double getTempEvap(int day, double tave, double trng)
                  cos(phi)*cos(del)*sin(omega));
     double e = 0.0023*ra/lamda*sqrt(tr)*(ta+17.8);    //evap. rate (mm/day)
     if ( e < 0.0 ) e = 0.0;
-    if ( UnitSystem == US ) e /= MMperINCH;           //evap rate (in/day)
+    if ( UnitSystem == US ) e /= MMperINCH;
     return e;
 }
 
@@ -1494,56 +1453,3 @@ void parseGhcndFileLine()
 }
 
 //=============================================================================
-
-////  New function added to release 5.1.010.  ////                             //(5.1.010)
-
-void updateTempMoveAve(double tmin, double tmax)
-//
-//  Input:   tmin = minimum daily temperature (deg F)
-//           tmax = maximum daily temperature (deg F)
-//  Output:  none
-//  Purpose: updates moving averages of average daily temperature
-//           and daily temperature range stored in structure Tma.
-//
-{
-    double ta,               // new day's average temperature (deg F)
-           tr;               // new day's temperature range (deg F)
-    int    count = Tma.count;
-
-    // --- find ta and tr from new day's min and max temperature
-    ta = (tmin + tmax) / 2.0;
-    tr = fabs(tmax - tmin);
-
-    // --- if the array used to store previous days' temperatures is full
-    if ( count == Tma.maxCount )
-    {
-        // --- update the moving averages with the new day's value
-        Tma.tAve = (Tma.tAve * count + ta - Tma.ta[Tma.front]) / count;
-        Tma.tRng = (Tma.tRng * count + tr - Tma.tr[Tma.front]) / count;
-
-        // --- replace the values at the front of the moving average window
-        Tma.ta[Tma.front] = ta;
-        Tma.tr[Tma.front] = tr;
-
-        // --- move the front one position forward
-        Tma.front++;
-        if ( Tma.front == count ) Tma.front = 0;
-    }
-
-    // --- array of previous day's values not full (at start of simulation)
-    else
-    {
-        // --- find new moving averages by adding new values to previous ones
-        Tma.tAve = (Tma.tAve * count + ta) / (count + 1);
-        Tma.tRng = (Tma.tRng * count + tr) / (count + 1);
-
-        // --- save new day's values
-        Tma.ta[Tma.front] = ta;
-        Tma.tr[Tma.front] = tr;
-
-        // --- increment count and front of moving average window
-        Tma.count++;
-        Tma.front++;
-        if ( Tma.count == Tma.maxCount ) Tma.front = 0;
-    }
-}

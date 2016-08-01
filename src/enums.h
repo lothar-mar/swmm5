@@ -7,7 +7,6 @@
 //            04/14/14  (Build 5.1.004)
 //            09/15/14  (Build 5.1.007)
 //            03/19/15  (Build 5.1.008)
-//            08/05/15  (Build 5.1.010)
 //   Author:  L. Rossman
 //
 //   Enumerated variables
@@ -23,10 +22,6 @@
 //   - Enumerations for fullness state of a conduit added.
 //   - NUM_THREADS added for number of parallel threads option.
 //   - Runoff flow categories added to represent mass balance components.
-//
-//   Build 5.1.010:
-//   - New ROADWAY_WEIR type of weir added.
-//   - Potential evapotranspiration (PET) added as a system output variable.
 //
 //-----------------------------------------------------------------------------
 
@@ -209,7 +204,7 @@
 //-------------------------------------
 // System-wide flow quantities
 //-------------------------------------
-#define MAX_SYS_RESULTS 15                                                     //(5.1.010)
+#define MAX_SYS_RESULTS 14
 enum SysFlowType {
      SYS_TEMPERATURE,                  // air temperature
      SYS_RAINFALL,                     // rainfall intensity
@@ -224,8 +219,7 @@ enum SysFlowType {
      SYS_FLOODING,                     // flooding outflow
      SYS_OUTFLOW,                      // outfall outflow
      SYS_STORAGE,                      // storage volume
-     SYS_EVAP,                         // evaporation
-     SYS_PET};                         // potential ET                         //(5.1.010)
+     SYS_EVAP};                        // evaporation
 
 //-------------------------------------
 // Conduit flow classifications
@@ -412,8 +406,7 @@ enum  CompatibilityType {
       TRANSVERSE_WEIR,                 // transverse weir
       SIDEFLOW_WEIR,                   // side flow weir
       VNOTCH_WEIR,                     // V-notch (triangular) weir
-      TRAPEZOIDAL_WEIR,                // trapezoidal weir
-      ROADWAY_WEIR};                   // FHWA HDS-5 roadway weir              //(5.1.010)
+      TRAPEZOIDAL_WEIR};               // trapezoidal weir
 
  enum CurveType {
       STORAGE_CURVE,                   // surf. area v. depth for storage node
