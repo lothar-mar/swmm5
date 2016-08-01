@@ -31,7 +31,7 @@
 //**********************************************************
 #define CLE     /* Compile as a command line executable */
 //#define SOL     /* Compile as a shared object library */
-//define DLL     /* Compile as a Windows DLL */
+//#define DLL     /* Compile as a Windows DLL */
 
 // --- define WINDOWS
 #undef WINDOWS
@@ -62,8 +62,7 @@
 #endif
 ////
 
-//#include <direct.h>	commented out. seems to prevent compiling with gcc.
-//#include <unistd.h>
+//#include <direct.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -728,7 +727,7 @@ char* getTempFileName(char* fname)
     if (strlen(TempDir) > 0)
     {
         _mkdir(TempDir);
-        dir = TempDir;
+	    dir = TempDir;
     }
 
     // --- use _tempnam to get a pointer to an unused file name

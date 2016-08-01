@@ -6,7 +6,6 @@
 //   Date:     03/20/14  (Build 5.1.000)
 //             09/15/14  (Build 5.1.007)
 //             04/02/15  (Build 5.1.008)
-//             08/05/15  (Build 5.1.010)
 //   Author:   L. Rossman (EPA)
 //             M. Tryby (EPA)
 //
@@ -19,9 +18,6 @@
 //   - Function list was re-ordered and blank lines added for readability.
 //   - Pollutant buildup/washoff functions for the new surfqual.c module added.
 //   - Several other functions added, re-named or have modified arguments.
-//
-//   Build 5.1.010:
-//   - New roadway_getInflow() function added.
 //
 //-----------------------------------------------------------------------------
 
@@ -430,11 +426,9 @@ double  xsect_getWofY(TXsect* xsect, double y);
 double  xsect_getYcrit(TXsect* xsect, double q);
 
 //-----------------------------------------------------------------------------
-//   Culvert/Roadway Methods                                                   //(5.1.010)
+//   Culvert Methods
 //-----------------------------------------------------------------------------
 double  culvert_getInflow(int link, double q, double h);
-double  roadway_getInflow(int link, double dir, double hcrest, double h1,
-        double h2);                                                            //(5.1.010)
 
 //-----------------------------------------------------------------------------
 //   Force Main Methods
