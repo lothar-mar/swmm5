@@ -358,11 +358,7 @@ void writeNodeFlows()
 "\n                                   Inflow   Inflow   Occurrence      Volume      Volume       Error"
 "\n  Node                 Type           %3s      %3s  days hr:min    %8s    %8s     Percent",
         FlowUnitWords[FlowUnits], FlowUnitWords[FlowUnits], VolUnitsWords[UnitSystem],
-<<<<<<< HEAD
-        VolUnitsWords2[UnitSystem]);                                           //(5.1.008)
-=======
         VolUnitsWords[UnitSystem]);                                            //(5.1.009)
->>>>>>> v5.1.009
     fprintf(Frpt.file,
 "\n  -------------------------------------------------------------------------------------------------");
 
