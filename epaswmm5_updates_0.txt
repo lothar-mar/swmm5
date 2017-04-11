@@ -2,6 +2,360 @@ SWMM 5.1 Update History
 =======================
 
 -------------------------
+Build 5.1.010 (08/05/15)
+-------------------------
+
+Engine Updates:
+
+1.  A modified version of Green-Ampt infiltration (MODIFIED GREEN AMPT) was
+    added that no longer redistributes upper zone moisture deficit during
+    low rainfall events. The original authors of SWMM's Green-Ampt model
+    have endorsed this modified version. It will produce more infiltration
+    for storm events that begin with low rainfall intensities, such as the
+    SCS design storm distributions.
+
+2.  A new type of weir, a ROADWAY weir, has been added. It models roadway
+    overtopping using the FHWA HDS-5 method and would typically be used in
+    parallel with a culvert conduit.
+
+3.  Rule premises can now test whether a link has been open (or closed) for
+    a specific period of time. See the Help file for more details.
+
+4.  Unsaturated hydraulic conductivity ("K") was added to the list of
+    variables that can be used in a user-supplied groundwater flow equation.
+
+5.  A bug introduced in update 2 of release 5.1.008 that failed to include
+    infiltration from LID units into the groundwater routine was fixed.
+
+6.  A bug that failed to properly initialize the flag indicating that one or
+    more LID controls was initially wet was fixed.
+
+7.  Duplicate printing of the first line of an LID detailed report file was
+    corrected.
+
+8.  The Hargreaves evaporation forumla was modified to use a 7-day running
+    average of daily temperatures, instead of just single day values, as
+    recommended by the formula's authors.
+
+9.  Daily potential evapotranspiration (PET) was added as a system output
+    variable.
+
+10. The qualrout.c module was refactored to make it more compact and easier
+    to follow.
+
+11. Storage seepage and evaporation losses are now based on the storage volume
+    at the end, not the start, of the prior time step.
+
+12. The command line used to build the engine included in the "makefile"
+    for the GNU C/C++ compiler was corrected to include the OpenMP libraries.
+
+GUI Updates:
+
+1.  Potential evapotranspiration (PET) was added as new system-wide variable
+    whose time series can be viewed with a graph or table.
+
+2.  A bug in the Number of Threads dropdown list on the Dynamic Wave Options
+    dialog was fixed.
+
+3.  Additional bugs in the Cross Section Editor remaining from changes made
+    in release 5.1.008 were fixed.
+
+4.  Changes were made to accommodate the new Modified Green-Ampt infiltration
+    option and the new Roadway weir option.
+
+5.  The automatic scaling of plots with all y-values the same was improved.
+
+6.  The automatic scaling of profile plots was improved and the ground surface
+    line was removed to improve clarity.
+
+7.  The function that automatically converts all link depth offsets to
+    elevation offsets now uses the node invert elevation value rather
+    than '*' for a zero offset.
+
+8.  A bug in using the Macro List on the Add-In Tools Properties form to
+    insert a selection into the Working Directory edit box was fixed. 
+    
+ 
+--------------------------
+Build 5.1.009 (04/30/2015)
+--------------------------
+
+General:
+
+1.  A missing DLL file used to parallelize SWMM's flow routing
+    routine was added to the installation package.
+
+Engine Updates:
+
+1.  A re-factoring bug that prevented running simulations longer
+    than 68 years was fixed.
+
+2.  An input parsing error that prevented the program from
+    recognizing a comparison between two variables in a
+    control rule premise was fixed.
+
+3.  A new warning message was added for when a control rule
+    premise compares two different types of variables.
+
+4.  When implementing 5.1.008 update 12, the runon to a
+    subcatchment fully occupied by LIDs was not being included
+    in the subcatchment's Summary Report.
+
+5.  A bug was fixed that allowed LID units to return outflow to
+    a subcatchment's pervious area even though LIDs occupied the
+    entire subcatchment.
+
+6.  For quality routing the definition of a dry conduit/storage
+    node was changed to <= 1 mm of depth to avoid concentrations
+    from blowing up due to evaporation losses.
+
+7.  The units label for Total Inflow Volume in the Node Inflow
+    Summary table of a saved report file was corrected.
+
+GUI Updates:
+
+1.  A bug introduced as a result of 5.1.008 GUI Update 11 that
+    prevented the name of a conduit's Transect or Shape Curve
+    from appearing in the Cross Section Editor was fixed.
+
+2.  A nicer default axis scaling routine is now used for time
+    series and scatter plots.
+
+3.  The user-supplied custom scaling for the vertical axis of a
+    profile plot is now recognized.
+
+
+
+--------------------------
+Build 5.1.008 (04/02/2015)
+--------------------------
+
+Engine Updates:
+
+New Features:
+=============
+
+1.  Monthly adjustments for hydraulic conductivity used for
+    rainfall infiltration and for exfiltration from storage
+    nodes and conduits was added.
+
+2.  LID drains can now send their outflow to a different node
+    or subcatchment than the parent subcatchment in which they
+    were placed.
+
+3.  Conveyance system Outfall nodes now have the option to
+    send their outflow onto a subcatchment, to simulate
+    irrigation or complex LID treatment options.
+
+4.  A new LID practice, Rooftop Disconnection, has been added.
+    It allows one to explicitly model roof runoff with an
+    optional limit on the flow capacity of their downspouts.
+    Disconnection is specified by setting the Return To Pervious
+    Area field in the [LID_USAGE] section to 1. 
+
+5.  An optional soil layer has been added to Permeable Pavement
+    LIDs so that a sand filter or bedding layer beneath the
+    pavement can be modeled.
+    
+6.  Several new built-in variable names can now be used in
+    custom groundwater flow equations for porosity, unsaturated
+    hydraulic conductivity, infiltration rate, and percolation
+    rate. See the Help file for more details.
+
+7.  A Groundwater Summary table has been added that reports 
+    several groundwater statistics for each subcatchment.
+
+8.  A new option, the Minimum Variable Time Step, was added that
+    limits the smallest time step that can be computed under
+    variable time stepping for dynamic wave flow routing. In
+    previous releases it was fixed at 0.5 seconds which remains
+    the default. The smallest value it can now have is 0.001 sec.
+
+9.  The dynamic wave routing procedure was parallelized to take
+    advantage of multiple processors, making it run several times
+    faster. A new option, THREADS, sets the number of parallel
+    threads to use, where the default is 1.
+
+10. A new column was added to the Node Depth Summary report table
+    that shows the maximum depth recorded at the Reporting Time Step
+    so it can be compared to the maximum depth attained over all
+    routing time steps also shown in the table.
+
+11. Control rule premises can now contain conditions that compare
+    the values of a node or link variable at two different locations
+    (e.g. IF NODE 123 HEAD > NODE 456 HEAD) and node volume was
+    added as a condition clause variable.
+
+Improvements:
+=============
+
+12. When a subcatchment with LID controls receives runon from another
+    source (e.g., a subcatchment, LID drain or outfall node) the
+    runon is now distributed only across the non-LID area of the sub-
+    catchment instead of the full area. If a single LID takes up the
+    full subcatchment area then the runon is directed onto the LID.
+
+13. Storage node HRT was added to the state variables saved in the
+    Hot Start file.
+
+14. The threshold value for reporting a non-zero runoff result
+    was changed from 0.001 cfs to 0.001 inches/hr.
+
+15. The calculation of overall flow routing mass balance was
+    modified to account for cases where some flow streams, like
+    total external inflow, are negative.
+
+16. The "Surface Runoff" label in the Runoff Continuity Report was
+    replaced with "Total Runoff" since the value reported consists
+    of both surface runoff and LID drain flow.
+
+17. The "Internal Outflow" label in the Flow Routing Continuity
+    Report was replaced with "Flooding Losses" to improve clarity.
+
+18. The pollutant washoff routines were moved to a new code module
+    (surfqual.c) and revised to account for the reduction in
+    pollutant load that results from runoff flow reduction by LID
+    units.
+
+19. Initial flows for Steady Flow routing are now ignored since they
+    are not used in the routing calculation and the initial volume
+    associated with them contributed to system mass balance error.
+
+20. The various types of lateral inflows to conveyance system nodes
+    are now evaluated at the date/time for the start of the routing
+    time step instead of at the end of the time step.
+
+21. The final runoff and routing time steps are adjusted to insure
+    that the simulation's total duration is not exceeded.
+
+22. When evaluating user-supplied math expressions, any NaN (Not a 
+    Number) result (caused by an underflow, overflow or divide by zero)
+    is set to 0 so that the NaN doesn't propagate through subsequent
+    calculations.
+
+Bug Fixes:
+==========
+
+23. The evaporation rates read from a time series would only change
+    when a new day was reached (even though values at more frequent
+    intervals were present) and could cause a run to stop pre-
+    maturely in some rare cases.
+
+24. The runoff read from a Hot Start file should have been assigned
+    to a subcatchment's newRunoff property, not to oldRunoff.
+
+25. An indexing bug that caused Hot Start files with snowmelt
+    parameters to be read incorrectly was fixed.
+
+26. The setting for a non-conduit link read from a Hot Start file
+    was not being used to initialize the link.
+
+27. A bug in adjusting snowmelt for snow covered area derived from
+    an areal depletion curve was fixed.
+
+28. Snowmelt should not have been included in the total
+    precipitation reported for a subcatchment since the snowfall
+    which produced it was already accounted for.
+
+29. When computing a flow rate through the Drainage Mat of a Green
+    Roof LID unit, the mat's void ratio was being applied to the
+    water depth instead of to the mat's area.
+
+30. The state of LID controls was not being considered when
+    choosing to use the wet or dry runoff time step which sometimes
+    lead to excessive LID continuity errors.
+
+31. A re-factoring bug that left reporting time in minutes instead
+    of hours in the detailed LID results file was fixed and results
+    are now written to the file at each runoff time step where the
+    state of the LID unit changes.
+
+32. Failure to initialize groundwater evaporation loss to 0 was
+    causing problems with the reported groundwater mass balance 
+    for subcatchments that had no pervious area.
+
+33. Excessive continuity errors for systems having conduits with
+    large seepage rates was fixed.
+
+34. Pollutant loss through seepage in conduits and storage nodes was
+    not being included in the mass balance calculations.
+
+35. Concentrations in conduits and storage nodes were not being
+    increased to account for loss of water volume when evaporation
+    was occurring.
+
+36. Premature exiting of the routine that checks for capacity limited
+    links whenever a non-conduit link was encountered was fixed.
+
+37. A bug in identifying the percent of time that a conduit has either
+    end full was fixed.
+
+38. A re-factoring bug that prevented surcharged weirs (see Update 5
+    for 5.1.007) from passing any flow was fixed.
+
+39. A bug in evaluating recursive calls to nodal water quality treatment
+    functions was fixed.
+
+
+GUI Updates:
+
+1.  The missing July - December column labels were restored on both
+    the evaporation and wind speed tables in the Climatology Editor.
+
+2.  The label "Surface Water Height (Hsw)" in the Groundwater Flow
+    Editor was changed to "Surface Water Depth" to make clear that
+    it is the depth of water at the receiving node and not the height
+    of water above the aquifer bottom (or Hsw as shown in the dialog's
+    diagram).
+
+3.  The label "Channel Bottom Height (Hcb)" also in the Groundwater
+    Flow Editor was changed to "Threshold Water Table Elev." to make
+    clear that it is an elevation and not a height above the aquifer
+    bottom (as Hcb is in the dialog's diagram).
+
+4.  A Groundwater Summary table was added to the form that displays
+    summary results tables.
+
+5.  Groundwater upper zone soil moisture and node lateral inflow are
+    now included in the abridged Hot Start file that the GUI can
+    produce (using the File | Export | Hot Start File command).
+
+6.  The column labels in the various sections of the SWMM input file
+    generated by the GUI were modified to better match the labels used
+    to describe the input file format in Appendix D of the Users Manual.
+
+7.  A "Route To" field was added to the Outfall Node property editor to
+    accommodate the new option of allowing outfall nodes to discharge
+    onto a subcatchment.
+
+8.  The Dynamic Wave page of the Simulation Options dialog was modified
+    to include the new Minimum Routing Time Step option and the new
+    Number of Threads option.
+
+9.  The LID Control Editor was updated to include the new Rooftop
+    Disconnection LID practice and the option to add a soil layer
+    to the Permeable Pavement practice.
+
+10. A Drain Outlet field was added to the LID Usage Editor.
+
+11. The conduit Cross Section Editor dialog was enhanced to display
+    a selectable list of standard size codes and their dimensions for
+    elliptical and arch pipes.
+
+12. Custom changes made to the Map's Legends are now saved with the
+    rest of a  project's settings in its .ini file.
+
+13. Word wrapping was added to the Title/Notes display in the
+    Project Browser to make the contents easier to read.
+
+14. Modal dialog message windows now appear centered over the form that
+    generates them instead of in the middle of the full display screen.
+
+15. The style of all dropdown list boxes was changed to make them more
+    visually appealing.
+    
+
+-------------------------
 Build 5.1.007 (9/15/2014)
 -------------------------
 

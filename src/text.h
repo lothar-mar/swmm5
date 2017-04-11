@@ -9,6 +9,8 @@
 //            04/23/14  (Build 5.1.005)
 //            05/19/14  (Build 5.1.006)
 //            09/15/14  (Build 5.1.007)
+//            03/19/15  (Build 5.1.008)
+//            04/30/15  (Build 5.1.009)
 //   Author:  L. Rossman
 //
 //   Text strings
@@ -16,7 +18,7 @@
 
 #define FMT01 \
  "\n Correct syntax is:\n swmm5 <input file> <report file> <output file>\n"
-#define FMT02 "\n... EPA-SWMM 5.1 (Build 5.1.007)\n"
+#define FMT02 "\n... EPA-SWMM 5.1 (Build 5.1.009)\n"                           //(5.1.009)
 
 #define FMT03 " There are errors.\n"
 #define FMT04 " There are warnings.\n"
@@ -24,7 +26,7 @@
 #define FMT06 "\n o  Retrieving project data"
 #define FMT07 "\n o  Writing output report"
 #define FMT08 \
-  "\n  EPA STORM WATER MANAGEMENT MODEL - VERSION 5.1 (Build 5.1.007)"
+  "\n  EPA STORM WATER MANAGEMENT MODEL - VERSION 5.1 (Build 5.1.009)"         //(5.1.009)
 #define FMT09 \
   "\n  --------------------------------------------------------------"
 #define FMT10 "\n"
@@ -52,6 +54,7 @@
 #define WARN08 "WARNING 08: elevation drop exceeds length for Conduit"
 #define WARN09 "WARNING 09: time series interval greater than recording interval for Rain Gage"
 #define WARN10 "WARNING 10: crest elevation is below downstream invert for regulator Link"
+#define WARN11 "WARNING 11: non-matching attributes in Control Rule"           //(5.1.009)
 
 // Analysis Option Keywords
 #define  w_FLOW_UNITS        "FLOW_UNITS"
@@ -93,6 +96,8 @@
 #define  w_SYS_FLOW_TOL      "SYS_FLOW_TOL"
 #define  w_LAT_FLOW_TOL      "LAT_FLOW_TOL"
 #define  w_IGNORE_RDII       "IGNORE_RDII"                                     //(5.1.004)
+#define  w_MIN_ROUTE_STEP    "MINIMUM_STEP"                                    //(5.1.008)
+#define  w_NUM_THREADS       "THREADS"                                         //(5.1.008)
 
 // Flow Units
 #define  w_CFS               "CFS"
