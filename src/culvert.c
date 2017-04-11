@@ -4,12 +4,16 @@
 //   Project:  EPA SWMM5
 //   Version:  5.1
 //   Date:     03/20/14   (Build 5.1.001)
+//             03/14/17   (Build 5.1.012)
 //   Author:   L. Rossman
 //
 //   Culvert equations for SWMM5
 //
 //   Computes flow reduction in a culvert-type conduit due to
 //   inlet control using equations from the FHWA HEC-5 circular.
+//
+//   Build 5.1.012:
+//   - Corrected value of Slope Correction Factor for mitered inlets.
 //
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
@@ -197,12 +201,12 @@ double culvert_getInflow(int j, double q0, double h)
     culvert.yFull = culvert.xsect->yFull;
     culvert.ad = culvert.xsect->aFull * sqrt(culvert.yFull);
 
-    // --- slope correction factor (-7 for mitered inlets, 0.5 for others)
+    // --- slope correction factor (-0.7 for mitered inlets, 0.5 for others)   //(5.1.012)
     switch (code)
     {
     case 5:
     case 37:
-    case 46: culvert.scf = -7.0 * Conduit[k].slope; break;
+    case 46: culvert.scf = -0.7 * Conduit[k].slope; break;                     //(5.1.012)
     default: culvert.scf = 0.5 * Conduit[k].slope;
     }
 

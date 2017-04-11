@@ -1,7 +1,7 @@
 A Roadmap to the SWMM 5 Engine Source Code
 ==========================================
 
-The SWMM 5 computational engine consists of 49 C-code files plus several
+The SWMM 5 computational engine consists of 51 C-code files plus several
 header files. The engine can be compiled either as a Dynamic Link Library
 (DLL) under Windows or as a stand-alone console application under both
 Windows and Linux, depending on which of the #define DLL and #define CLE
@@ -83,8 +83,10 @@ infil.c       performs infiltration calculations on a project's subcatchments.
 gwater.c      computes groundwater fluxes and updates groundwater depths over
               the project's study area.
 
-subcatch.c    computes rainfall runoff, pollutant buildup and washoff, and
-              street sweeping over individual subcatchments.
+subcatch.c    computes rainfall runoff from individual subcatchments.
+
+surfqual.c    computes pollutant buildup, washoff, and street sweeping over
+              individual subcatchments.
 
 landuse.c     evaluates pollutant buildup and washoff functions for a project's
               various types of land uses.
@@ -140,7 +142,12 @@ forcmain.c     computes friction losses in force mains that use either the
                Manning equation for pressurized flow.
 
 culvert.c      computes flow reduction in culvert-type conduits due to
-               inlet control using equations from the FHWA HEC-5 circular.
+               inlet control using the FHWA HDS-5 methodology.
+
+roadway.c      computes flow overtopping a roadway using the FWHA HDS-5
+               methodology.
+
+exfil.c        computes exfiltration from beneath storage units.
 
 -------------------------------------------------------------------------------
 
@@ -164,7 +171,8 @@ keywords.c     defines lists of keywords that appear as part of a SWMM 5
                input file.
 
 mathexpr.c     functions that parse and evaluate user-supplied mathematical
-               expressions for pollutant removal at treatment nodes.
+               expressions for pollutant removal at treatment nodes and for
+               groundwater outflow from subcatchments.
 
 mempool.c      functions that provide a memory pool used to store object
                ID names.

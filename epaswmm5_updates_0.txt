@@ -1,6 +1,211 @@
 SWMM 5.1 Update History
 =======================
 
+------------------------
+Build 5.1.012 (03/14/17)
+------------------------
+
+Engine Updates:
+
+1.  The direct.h header is now only #included in the swmm5.c file when
+    compiled for Windows. (swmm5.c)
+
+2.  Engine Update #7 in Build 5.1.011 (internally aligning the wet time
+    step with the reporting time step) was redacted since it caused
+    problems for certain combinations of time steps. (runoff.c)
+
+3.  A subcatchment's bottom elevation is now used instead its parent
+    aquifer's value when saving a water table value to the binary results
+    file. (subcatch.c)
+
+4.  A bug that failed to limit surface inflitration into a saturated rain
+    garden LID unit was fixed. (lidproc.c)
+
+5.  Calculation of the maximum limit on LID drain flows was modified to
+    produce smoother results at low depths above the drain offset.
+    (lidproc.c)
+
+6.  A variable used for reporting detailed LID results is now properly
+    initialized. (lid.c & lid.h)
+
+7.  The occasional writing of duplicate lines to the detailed LID results
+    file was fixed. (lidproc.c)
+
+8.  The conversion from conduit seepage rate per unit area to rate per unit
+    of length was changed to use top width instead of wetted perimeter since
+    only vertical seepage is assumed to occur. (link.c)
+
+9.  The coefficient of the evaporation/seepage term in the dynamic wave
+    equation for updating conduit flow was corrected (from 1.5 to 2.5).
+    (dwflow.c)
+
+10. The Engels flow equation for side flow weirs was corrected (the original
+    equation used in SWMM 3 & 4 was incorrect). (link.c)
+
+11. Crest length reductions for end contractions are no longer used for
+    trapezoidal weirs. (link.c)
+
+12. The Slope Correction Factor for culverts with mitered inlets was corrected.
+    (culvert.c)
+
+13. An entry in the table of gravel roadway weir coefficients was corrected.
+    (roadway.c)
+
+14. The user supplied minimum slope option is now initialized to 0.0
+    (meaning none is provided). (project.c)
+
+15. NO/YES are no longer accepted as attributes for the NORMAL_FLOW_LIMITED
+    dynamic wave simulation option (only SLOPE/FROUDE/BOTH are valid).
+    (project.c)
+
+16. Changes were made so that the Routing Events and Skip Steady Flow
+    options work correctly together. (routing.c & globals.h)
+
+17. Steady state periods with no flow routing no longer contribute to the
+    routing time step statistics. (stats.c and report.c)
+
+18. When compiling statistics on the frequency of full conduit flow the
+    number of barrels is now accounted for. (stats.c)
+
+19. Under kinematic wave or steady flow routing, the water level in
+    storage nodes that have no outflow links is now updated correctly
+    over time. (flowrout.c) 
+
+20. The formula for the depth at maximum width for the Modified Basket Handle
+    cross section was corrected. (xsect.c)
+
+
+GUI Updates:
+
+1.  Profile plots now correctly update the main and axis title text when
+    changed via the Profile Plot Options dialog. Also the downstream
+    offset height of non-conduit links is set to 0 on the plot.
+
+2.  The LID Control Editor now sets the Storage Layer Thickness to 0 when
+    a Rain Garden is selected as the type of LID being edited.
+
+3.  An OnChange event handler was added to each of the LID Control Editor's
+    data fields to record when a value is changed.
+
+------------------------
+Build 5.1.011 (08/22/16)
+------------------------
+
+Engine Updates:
+
+1.  Detailed flow routing can now be restricted to a set of pre-defined
+    event periods. The event periods are listed in an [EVENTS] section
+    of the SWMM input file, where each line contains a start date,
+    start time, end date and end time for each event.
+
+2.  New functions, swmm_getError() and swmm_getWarnings(), were added to
+    the API used for interfacing SWMM with other applications (see the
+    updated Interfacing Guide for details).
+
+3.  The error codes returned by the API functions (swmm_open, swmm_start,
+    swmm_step, etc.) were corrected.
+
+4.  The new format for precipitation amounts in rainfall files downloaded
+    from the NCDC's Climate Data Online service are now recognized.
+
+5.  Monthly adjustments for hydraulic conductivity are now also
+    applied to the internal Green-Ampt "Lu" parameter which varies with
+    the square root of conductivity.
+
+6.  A check was added to insure that subcatchment imperviousness does
+    not exceed 100 percent.
+
+7.  Runoff time steps are now adjusted to stay aligned with the Report
+    time step (making model validation easier).
+
+8.  A time step correction was made when computing the outflow volume
+    produced by an outfall that sends its outflow back onto a designated
+    subcatchment.
+
+9.  The LID routines were modified so that native soil infiltration is
+    satisfied first when it occurs along with underdrain flow, instead
+    of the other way around.
+
+10. The allowable offset height for an LID underdrain is no longer
+    limited to the top of the storage layer thus allowing upturned
+    drains to be modelled.
+
+11. The detailed LID report file now lists results by both date/time
+    and elapsed hours and reports water level instead of moisture
+    content for permeable pavement.
+
+12. If the offset of the opening of a regulator link is below its
+    downstream node invert it is now raised to the invert level
+    and a warning message is still issued.
+
+13. A weir with an open rectangular shape and non-zero slope parameter
+    will no longer generate an input error message - the slope value is
+    now ignored.
+
+14. An illegal array index bug that could occur when checking the pump
+    curve type for an Ideal Pump in dynamic wave flow routing was fixed.
+
+15. A redundant unit conversion of max. reported depth from the Node
+    Depth Summary table was removed.
+
+16. Node surcharging is now only reported for dynamic wave flow routing
+    and storage nodes are never classified as surcharged.
+
+17. A failure to convert a storage unit's surface area curve from metric 
+    to internal units when computing bottom exfiltration was fixed.
+
+18. A bug that caused a link's TIMEOPEN variable (used in control rule
+    conditions) to be re-set to 0 when its setting changed from one
+    partly opened state to another was fixed.
+
+19. The Status Report no longer lists control actions taken by modulated
+    controls since they occur continuously over time and can produce an
+    enormous number of actions.
+
+20. A failure to convert a Roadway Weir's road width that was in metric
+    units was fixed.
+
+21. A bug that caused the saved link settings read from a hot start
+    file to be incorrect in a model containing pollutants was fixed.
+
+22. Rule premises can now include SIMULATION DAYOFYEAR as a condition,
+    where day of year is either in month/day format or a number between
+    1 and 365.
+
+23. A refactoring bug that affected water quality mass balance results
+    for Steady Flow routing was fixed.
+
+24. The function that decodes the fractional part of a date/time value
+    into hours:minutes:seconds was modified so that rounding doesn't
+    cause the time to exceed 24 hours.
+
+25. Microsoft exception handling statements are now only enabled when
+    the engine is compiled with the Microsoft C compiler.
+
+GUI Updates:
+
+1.  A new sub-category of simulation options named Events was added along
+    with an Event Editor dialog to allow users to restrict detailed flow
+    routing calculations to specific periods of time. See the Help file
+    topic under Reference | Special Dialog Forms | Events Editor.
+
+2.  When a Rain Garden is selected in the LID Control Editor, the Storage
+    layer tab now appears so that a bottom Seepage Rate can be specified.
+    This fixes the problem of having no inflitration out of a Rain Garden.
+
+3.  After a simulation has been completed the Run Status dialog box now
+    indicates if any warning messages have been issued.     
+
+4.  A previously uninitialized variable (elapsed simulation time) passed
+    between the GUI and the engine is now assigned an initial value.
+
+5.  The ground surface line on a Profile Plot can now be made visible or
+    not via the Profile Plot Options dialog, with the default being visible.
+
+6.  An option to use thick lines to outline conduits and the ground surface
+    in Profile Plots was added.
+
+
 -------------------------
 Build 5.1.010 (08/05/15)
 -------------------------

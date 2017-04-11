@@ -7,6 +7,8 @@
 //            04/14/14  (Build 5.1.004)
 //            09/15/14  (Build 5.1.007)
 //            03/19/15  (Build 5.1.008)
+//            08/05/15  (Build 5.1.010)
+//            08/01/16  (Build 5.1.011)
 //   Author:  L. Rossman
 //
 //   Enumerated variables
@@ -22,6 +24,13 @@
 //   - Enumerations for fullness state of a conduit added.
 //   - NUM_THREADS added for number of parallel threads option.
 //   - Runoff flow categories added to represent mass balance components.
+//
+//   Build 5.1.010:
+//   - New ROADWAY_WEIR type of weir added.
+//   - Potential evapotranspiration (PET) added as a system output variable.
+//
+//   Build 5.1.011:
+//   - s_EVENT added to InputSectionType enumeration.
 //
 //-----------------------------------------------------------------------------
 
@@ -204,7 +213,7 @@
 //-------------------------------------
 // System-wide flow quantities
 //-------------------------------------
-#define MAX_SYS_RESULTS 14
+#define MAX_SYS_RESULTS 15                                                     //(5.1.010)
 enum SysFlowType {
      SYS_TEMPERATURE,                  // air temperature
      SYS_RAINFALL,                     // rainfall intensity
@@ -219,7 +228,8 @@ enum SysFlowType {
      SYS_FLOODING,                     // flooding outflow
      SYS_OUTFLOW,                      // outfall outflow
      SYS_STORAGE,                      // storage volume
-     SYS_EVAP};                        // evaporation
+     SYS_EVAP,                         // evaporation
+     SYS_PET};                         // potential ET                         //(5.1.010)
 
 //-------------------------------------
 // Conduit flow classifications
@@ -406,7 +416,8 @@ enum  CompatibilityType {
       TRANSVERSE_WEIR,                 // transverse weir
       SIDEFLOW_WEIR,                   // side flow weir
       VNOTCH_WEIR,                     // V-notch (triangular) weir
-      TRAPEZOIDAL_WEIR};               // trapezoidal weir
+      TRAPEZOIDAL_WEIR,                // trapezoidal weir
+      ROADWAY_WEIR};                   // FHWA HDS-5 roadway weir              //(5.1.010)
 
  enum CurveType {
       STORAGE_CURVE,                   // surf. area v. depth for storage node
@@ -434,7 +445,7 @@ enum  CompatibilityType {
       s_COORDINATE,   s_VERTICES,     s_POLYGON,      s_LABEL,
       s_SYMBOL,       s_BACKDROP,     s_TAG,          s_PROFILE,
       s_MAP,          s_LID_CONTROL,  s_LID_USAGE,    s_GWF,                   //(5.1.007)
-      s_ADJUST};                                                               //(5.1.007)
+      s_ADJUST,       s_EVENT};                                                //(5.1.011)
 
  enum InputOptionType {
       FLOW_UNITS,        INFIL_MODEL,       ROUTE_MODEL, 
