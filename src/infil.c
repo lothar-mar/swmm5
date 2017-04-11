@@ -6,6 +6,8 @@
 //   Date:     03/20/14  (Build 5.1.001)
 //             09/15/14  (Build 5.1.007)
 //             03/19/15  (Build 5.1.008)
+//             08/05/15  (Build 5.1.010)
+//             08/01/16  (Build 5.1.011)
 //   Author:   L. Rossman
 //
 //   Infiltration functions.
@@ -18,6 +20,14 @@
 //   Build 5.1.008:
 //   - Monthly adjustment factors applied to hydraulic conductivity.
 //
+//   Build 5.1.010:
+//   - Support for Modified Green Ampt model added.
+//   - Green-Ampt initial recovery time set to 0.
+//
+//   Build 5.1.011:
+//   - Monthly hydraulic conductivity factor also applied to Fu parameter
+//     for Green-Ampt infiltration.
+//   - Prevented computed Horton infiltration from dropping below f0.
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
@@ -68,7 +78,7 @@ static double modHorton_getInfil(THorton *infil, double tstep, double irate,
 static void   grnampt_getState(TGrnAmpt *infil, double x[]);
 static void   grnampt_setState(TGrnAmpt *infil, double x[]);
 static double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep,
-              double irate, double depth);
+              double irate, double depth, int modelType);                      //(5.1.010)
 static double grnampt_getSatInfil(TGrnAmpt *infil, double tstep,
               double irate, double depth);
 static double grnampt_getF2(double f1, double c1, double ks, double ts);
@@ -98,6 +108,7 @@ void infil_create(int subcatchCount, int model)
         if ( HortInfil == NULL ) ErrorCode = ERR_MEMORY;
         break;
     case GREEN_AMPT:
+    case MOD_GREEN_AMPT:                                                       //(5.1.010)
         GAInfil = (TGrnAmpt *) calloc(subcatchCount, sizeof(TGrnAmpt));
         if ( GAInfil == NULL ) ErrorCode = ERR_MEMORY;
         break;
@@ -147,6 +158,7 @@ int infil_readParams(int m, char* tok[], int ntoks)
     if      ( m == HORTON )       n = 5;
     else if ( m == MOD_HORTON )   n = 5;
     else if ( m == GREEN_AMPT )   n = 4;
+    else if ( m == MOD_GREEN_AMPT )   n = 4;                                   //(5.1.010)
     else if ( m == CURVE_NUMBER ) n = 4;
     else return 0;
     if ( ntoks < n ) return error_setInpError(ERR_ITEMS, "");
@@ -173,7 +185,9 @@ int infil_readParams(int m, char* tok[], int ntoks)
       case HORTON:
       case MOD_HORTON:   status = horton_setParams(&HortInfil[j], x);
                          break;
-      case GREEN_AMPT:   status = grnampt_setParams(&GAInfil[j], x);
+      case GREEN_AMPT:
+      case MOD_GREEN_AMPT:                                                     //(5.1.010)
+                         status = grnampt_setParams(&GAInfil[j], x);
                          break;
       case CURVE_NUMBER: status = curvenum_setParams(&CNInfil[j], x);
                          break;
@@ -197,7 +211,9 @@ void infil_initState(int j, int m)
     {
       case HORTON:
       case MOD_HORTON:   horton_initState(&HortInfil[j]);   break;
-      case GREEN_AMPT:   grnampt_initState(&GAInfil[j]);    break;
+      case GREEN_AMPT:
+      case MOD_GREEN_AMPT:                                                     //(5.1.010)
+                         grnampt_initState(&GAInfil[j]);    break;
       case CURVE_NUMBER: curvenum_initState(&CNInfil[j]);   break;
     }
 }
@@ -216,7 +232,9 @@ void infil_getState(int j, int m, double x[])
     {
       case HORTON:
       case MOD_HORTON:   horton_getState(&HortInfil[j], x); break;
-      case GREEN_AMPT:   grnampt_getState(&GAInfil[j],x);   break;
+      case GREEN_AMPT:
+      case MOD_GREEN_AMPT:                                                     //(5.1.010)
+                         grnampt_getState(&GAInfil[j],x);   break;
       case CURVE_NUMBER: curvenum_getState(&CNInfil[j], x); break;
     }
 }
@@ -235,7 +253,9 @@ void infil_setState(int j, int m, double x[])
     {
       case HORTON:
       case MOD_HORTON:   horton_setState(&HortInfil[j], x); break;
-      case GREEN_AMPT:   grnampt_setState(&GAInfil[j],x);   break;
+      case GREEN_AMPT:
+      case MOD_GREEN_AMPT:                                                     //(5.1.010)
+                         grnampt_setState(&GAInfil[j],x);   break;
       case CURVE_NUMBER: curvenum_setState(&CNInfil[j], x); break;
     }
 }
@@ -265,7 +285,8 @@ double infil_getInfil(int j, int m, double tstep, double rainfall,
                                     depth);
 
       case GREEN_AMPT:
-        return grnampt_getInfil(&GAInfil[j], tstep, rainfall+runon, depth);
+      case MOD_GREEN_AMPT:                                                     //(5.1.010)
+        return grnampt_getInfil(&GAInfil[j], tstep, rainfall+runon, depth, m); //(5.1.010)
 
       case CURVE_NUMBER:
         depth += runon / tstep;
@@ -391,6 +412,7 @@ double horton_getInfil(THorton *infil, double tstep, double irate, double depth)
             F1 = fmin * t1 + df / kd * (1.0 - exp(-kd * t1));
         }
         fp = (F1 - Fp) / tstep;
+        fp = MAX(fp, fmin);                                                    //(5.1.011)
 
         // --- limit infil rate to available infil
         if ( fp > fa ) fp = fa;
@@ -490,6 +512,7 @@ double modHorton_getInfil(THorton *infil, double tstep, double irate,
 
         // --- potential infiltration
         fp = f0 - kd * infil->Fe;                                              //(5.1.008)
+        fp = MAX(fp, fmin);                                                    //(5.1.011)
 
         // --- actual infiltration
         f = MIN(fa, fp);
@@ -545,7 +568,7 @@ void grnampt_initState(TGrnAmpt *infil)
     infil->Fu = 0.0;                                                           //(5.1.007)
     infil->F = 0.0;
     infil->Sat = FALSE;
-    infil->T = 5400.0 / infil->Lu / Evap.recoveryFactor;
+    infil->T = 0.0;                                                            //(5.1.010)
 }
 
 void grnampt_getState(TGrnAmpt *infil, double x[])
@@ -571,28 +594,29 @@ void grnampt_setState(TGrnAmpt *infil, double x[])
 ////  This function was re-written for release 5.1.007  ////                   //(5.1.007)
 
 double grnampt_getInfil(TGrnAmpt *infil, double tstep, double irate,
-    double depth)
+    double depth, int modelType)                                               //(5.1.010)
 //
 //  Input:   infil = ptr. to Green-Ampt infiltration object
 //           tstep =  time step (sec),
 //           irate = net "rainfall" rate to upper zone (ft/sec);
 //                 = rainfall + snowmelt + runon,
 //                   does not include ponded water (added on below)
-//           depth = depth of ponded water (ft).
+//           depth = depth of ponded water (ft)
+//           modelType = either GREEN_AMPT or MOD_GREEN_AMPT                   //(5.1.010)
 //  Output:  returns infiltration rate (ft/sec)
 //  Purpose: computes Green-Ampt infiltration for a subcatchment
 //           or a storage node.
 //
 {
     // --- find saturated upper soil zone water volume
-    Fumax = infil->IMDmax * infil->Lu;
+    Fumax = infil->IMDmax * infil->Lu * sqrt(Adjust.hydconFactor);             //(5.1.011)
 
     // --- reduce time until next event
     infil->T -= tstep;
 
     // --- use different procedures depending on upper soil zone saturation
     if ( infil->Sat ) return grnampt_getSatInfil(infil, tstep, irate, depth);
-    else              return grnampt_getUnsatInfil(infil, tstep, irate, depth);
+    else return grnampt_getUnsatInfil(infil, tstep, irate, depth, modelType);
 }
 
 //=============================================================================
@@ -600,14 +624,15 @@ double grnampt_getInfil(TGrnAmpt *infil, double tstep, double irate,
 ////  New function added to release 5.1.007  ////                              //(5.1.007)
 
 double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep, double irate,
-    double depth)
+    double depth, int modelType)
 //
 //  Input:   infil = ptr. to Green-Ampt infiltration object
 //           tstep =  runoff time step (sec),
 //           irate = net "rainfall" rate to upper zone (ft/sec);
 //                 = rainfall + snowmelt + runon,
 //                   does not include ponded water (added on below)
-//           depth = depth of ponded water (ft).
+//           depth = depth of ponded water (ft)
+//           modelType = either GREEN_AMPT or MOD_GREEN_AMPT                   //(5.1.010)
 //  Output:  returns infiltration rate (ft/sec)
 //  Purpose: computes Green-Ampt infiltration when upper soil zone is
 //           unsaturated.
@@ -615,6 +640,7 @@ double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep, double irate,
 {
     double ia, c1, F2, dF, Fs, kr, ts;
     double ks = infil->Ks * Adjust.hydconFactor;                               //(5.1.008)
+    double lu = infil->Lu * sqrt(Adjust.hydconFactor);                         //(5.1.011)
 
     // --- get available infiltration rate (rainfall + ponded water)
     ia = irate + depth / tstep;
@@ -624,7 +650,7 @@ double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep, double irate,
     if ( ia == 0.0 )
     {
         if ( infil->Fu <= 0.0 ) return 0.0;
-        kr = infil->Lu / 90000.0 * Evap.recoveryFactor;
+        kr = lu / 90000.0 * Evap.recoveryFactor;                               //(5.1.011)
         dF = kr * Fumax * tstep;
         infil->F -= dF;
         infil->Fu -= dF;
@@ -639,7 +665,7 @@ double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep, double irate,
         // --- if new wet event begins then reset IMD & F
         if ( infil->T <= 0.0 )
         {
-            infil->IMD = (Fumax - infil->Fu) / infil->Lu;
+            infil->IMD = (Fumax - infil->Fu) / lu;                             //(5.1.011)
             infil->F = 0.0;
         }
         return 0.0;
@@ -652,16 +678,16 @@ double grnampt_getUnsatInfil(TGrnAmpt *infil, double tstep, double irate,
         infil->F += dF;
         infil->Fu += dF;
         infil->Fu = MIN(infil->Fu, Fumax);
-        if ( infil->T <= 0.0 )
+        if ( modelType == GREEN_AMPT &&  infil->T <= 0.0 )                     //(5.1.010)
         {
-            infil->IMD = (Fumax - infil->Fu) / infil->Lu;
+            infil->IMD = (Fumax - infil->Fu) / lu;                             //(5.1.011)
             infil->F = 0.0;
         }
         return ia;
     }
 
     // --- rainfall exceeds Ksat; renew time to drain upper zone
-    infil->T = 5400.0 / infil->Lu / Evap.recoveryFactor;
+    infil->T = 5400.0 / lu / Evap.recoveryFactor;                              //(5.1.011)
 
     // --- find volume needed to saturate surface layer
     Fs = ks * (infil->S + depth) * infil->IMD / (ia - ks);                     //(5.1.008)
@@ -722,13 +748,14 @@ double grnampt_getSatInfil(TGrnAmpt *infil, double tstep, double irate,
 {
     double ia, c1, dF, F2;
     double ks = infil->Ks * Adjust.hydconFactor;                               //(5.1.008)
+    double lu = infil->Lu * sqrt(Adjust.hydconFactor);                         //(5.1.011)
 
     // --- get available infiltration rate (rainfall + ponded water)
     ia = irate + depth / tstep;
     if ( ia < ZERO ) return 0.0;
 
     // --- re-set new event recovery time
-    infil->T = 5400.0 / infil->Lu / Evap.recoveryFactor;
+    infil->T = 5400.0 / lu / Evap.recoveryFactor;                              //(5.1.011)
 
     // --- solve G-A equation for new cumulative infiltration volume (F2)
     c1 = (infil->S + depth) * infil->IMD;

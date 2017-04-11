@@ -6,6 +6,9 @@
 //   Date:     03/20/14   (Build 5.1.001)
 //             09/15/14   (Build 5.1.007)
 //             03/19/15   (Build 5.1.008)
+//             08/05/15   (Build 5.1.010)
+//             08/01/16   (Build 5.1.011)
+//             03/14/17   (Build 5.1.012)
 //   Author:   L. Rossman (EPA)
 //             M. Tryby (EPA)
 //
@@ -20,6 +23,21 @@
 //   - Monthly conductivity adjustment applied to conduit seepage.
 //   - Conduit seepage limited by conduit's flow rate.
 //
+//   Build 5.1.010:
+//   - Support added for new ROADWAY_WEIR object.
+//   - Time of last setting change initialized for links.
+//
+//   Build 5.1.011:
+//   - Crest elevation of regulator links raised to downstream invert.
+//   - Fixed converting roadWidth weir parameter to internal units.
+//   - Weir shape parameter deprecated.
+//   - Extra geometric parameters ignored for non-conduit open rectangular
+//     cross sections.
+//
+//   Build 5.1.012:
+//   - Conduit seepage rate now based on flow width, not wetted perimeter.
+//   - Formula for side flow weir corrected.
+//   - Crest length contraction adjustments corrected.
 //-----------------------------------------------------------------------------
 #define _CRT_SECURE_NO_DEPRECATE
 
@@ -184,6 +202,15 @@ int link_readXsectParams(char* tok[], int ntoks)
             if ( !getDouble(tok[i], &x[i-2]) )
                 return error_setInpError(ERR_NUMBER, tok[i]);
         }
+
+////  Following code segment added to release 5.1.011.  ////                   //(5.1.011)
+        // --- ignore extra parameters for non-conduit open rectangular shapes 
+        if ( Link[j].type != CONDUIT && k == RECT_OPEN )
+        {
+            x[2] = 0.0;
+            x[3] = 0.0;
+        }
+////
         if ( !xsect_setParams(&Link[j].xsect, k, x, UCF(LENGTH)) )
         {
             return error_setInpError(ERR_NUMBER, "");
@@ -321,6 +348,9 @@ void  link_setParams(int j, int type, int n1, int n2, int k, double x[])
         Weir[k].endCon       = x[4];
         Weir[k].cDisch2      = x[5];
         Weir[k].canSurcharge = (int)x[6];                                      //(5.1.007)
+        Weir[k].roadWidth    = x[7] / UCF(LENGTH);                             //(5.1.011)
+        Weir[k].roadSurface  = (int)x[8];                                      //(5.1.010)
+//      Weir[k].shape        = -(int)x[9];  //DELETED//                        //(5.1.011)
         break;
 
       case OUTLET:
@@ -366,8 +396,12 @@ void  link_validate(int j)
       case OUTLET:
           if ( Node[Link[j].node1].invertElev + Link[j].offset1 <
                Node[Link[j].node2].invertElev )
-               report_writeWarningMsg(WARN10, Link[j].ID);
-    }
+          {
+              Link[j].offset1 = Node[Link[j].node2].invertElev -               //(5.1.011)
+                                Node[Link[j].node1].invertElev;                //(5.1.011)
+              report_writeWarningMsg(WARN10, Link[j].ID);
+          }
+    }    
 
     // --- force max. depth of end nodes to be >= link crown height
     //     at non-storage nodes
@@ -454,6 +488,7 @@ void link_initState(int j)
     Link[j].newVolume = 0.0;
     Link[j].setting   = 1.0;
     Link[j].targetSetting = 1.0;
+    Link[j].timeLastSet = StartDate;                                           //(5.1.010)
     Link[j].inletControl  = FALSE;
     Link[j].normalFlow    = FALSE;
     if ( Link[j].type == CONDUIT ) conduit_initState(j, Link[j].subIndex);
@@ -500,9 +535,18 @@ void link_setOldHydState(int j)
 //  Purpose: replaces link's old hydraulic state values with current ones.
 //
 {
+    int k;
+
     Link[j].oldDepth  = Link[j].newDepth;
     Link[j].oldFlow   = Link[j].newFlow;
     Link[j].oldVolume = Link[j].newVolume;
+
+    if ( Link[j].type == CONDUIT )
+    {
+        k = Link[j].subIndex;
+        Conduit[k].q1Old = Conduit[k].q1;
+        Conduit[k].q2Old = Conduit[k].q2;
+    }
 }
 
 //=============================================================================
@@ -1254,19 +1298,19 @@ double conduit_getLossRate(int j, double q, double tStep)                      /
 //           from a conduit (per barrel).                                      //(5.1.008)
 //
 {
-	TXsect *xsect;
-	double depth = 0.5 * (Link[j].oldDepth + Link[j].newDepth);
+    TXsect *xsect;
+    double depth = 0.5 * (Link[j].oldDepth + Link[j].newDepth);
     double length;
     double topWidth;
-    double wettedPerimeter;
+    //double wettedPerimeter;    //DEPRECATED                                  //(5.1.012)
     double maxLossRate;
-	double evapLossRate = 0.0,
+    double evapLossRate = 0.0,
            seepLossRate = 0.0,
            totalLossRate = 0.0;
 
     if ( depth > FUDGE )
     {
-	    xsect = &Link[j].xsect;
+        xsect = &Link[j].xsect;
         length = conduit_getLength(j);
 
         // --- find evaporation rate for open conduits
@@ -1281,17 +1325,20 @@ double conduit_getLossRate(int j, double q, double tStep)                      /
         {
             // limit depth to depth at max width
             if ( depth >= xsect->ywMax ) depth = xsect->ywMax;
-
+			
+//// The following section was deprecated for release 5.1.012. ////            //(5.1.012)			
             // get wetted perimeter
-            wettedPerimeter = 0.0;
-            if ( depth > 0.0 )
-            {
-                wettedPerimeter = xsect_getAofY(xsect, depth) /
-                                  xsect_getRofY(xsect, depth);
-            }
+//          wettedPerimeter = 0.0;
+//          if ( depth > 0.0 )
+//          {
+//              wettedPerimeter = xsect_getAofY(xsect, depth) /
+//                                xsect_getRofY(xsect, depth);
+//          }
+/////////////////////////////////////////////////////////////////
 
             // compute seepage loss rate across length of conduit
-            seepLossRate = Link[j].seepRate * wettedPerimeter * length;
+            seepLossRate = Link[j].seepRate * xsect_getWofY(xsect, depth) *    //(5.1.012)
+                           length;
             seepLossRate *= Adjust.hydconFactor;                               //(5.1.008)
         }
 
@@ -1937,7 +1984,7 @@ int   weir_readParams(int j, int k, char* tok[], int ntoks)
 {
     int    m;
     int    n1, n2;
-    double x[7];                                                               //(5.1.007)
+    double x[9];                                                               //(5.1.010)
     char*  id;
 
     // --- check for valid ID and end node IDs
@@ -1962,6 +2009,8 @@ int   weir_readParams(int j, int k, char* tok[], int ntoks)
     x[4] = 0.0;
     x[5] = 0.0;
     x[6] = 1.0;                                                                //(5.1.007)
+    x[7] = 0.0;                                                                //(5.1.010)
+    x[8] = 0.0;                                                                //(5.1.010)
     if ( ntoks >= 7 && *tok[6] != '*' )                                        //(5.1.007)
     {
         m = findmatch(tok[6], NoYesWords);
@@ -1984,8 +2033,25 @@ int   weir_readParams(int j, int k, char* tok[], int ntoks)
     {
         m = findmatch(tok[9], NoYesWords);
         if ( m < 0 ) return error_setInpError(ERR_KEYWORD, tok[9]);
-        x[6] = m;                                          // canSurcharge
+        x[6] = m;                                           // canSurcharge
     }
+////
+
+////  Following segment added for release 5.1.010.  ////                       //(5.1.010)
+    if ( (m = (int)x[0]) == ROADWAY_WEIR )
+    {
+        if ( ntoks >= 11 )                                  // road width
+        {
+            if ( ! getDouble(tok[10], &x[7]) || x[7] < 0.0 ) 
+                return error_setInpError(ERR_NUMBER, tok[10]);
+        }
+        if ( ntoks >= 12 )                                  // road surface
+        {
+            if ( strcomp(tok[11], "PAVED") ) x[8] = 1.0;
+            else if ( strcomp(tok[11], "GRAVEL") ) x[8] = 2.0;
+        }
+    }
+////
 
     // --- add parameters to weir object
     Link[j].ID = id;
@@ -2011,6 +2077,7 @@ void  weir_validate(int j, int k)
     {
       case TRANSVERSE_WEIR:
       case SIDEFLOW_WEIR:
+      case ROADWAY_WEIR:                                                       //(5.1.010)
         if ( Link[j].xsect.type != RECT_OPEN ) err = ERR_REGULATOR_SHAPE;
         Weir[k].slope = 0.0;
         break;
@@ -2075,6 +2142,7 @@ void weir_setSetting(int j)
     // --- adjust weir setting
     Link[j].setting = Link[j].targetSetting;
     if ( !Weir[k].canSurcharge ) return;
+    if ( Weir[k].type == ROADWAY_WEIR ) return;                                //(5.1.010)
 
     // --- find orifice coeff. for surcharged flow
     if ( Link[j].setting == 0.0 ) Weir[k].cSurcharge = 0.0;
@@ -2144,6 +2212,12 @@ double weir_getInflow(int j)
     // --- find head of weir's crest and crown
     hcrest = Node[n1].invertElev + Link[j].offset1;
     hcrown = hcrest + Link[j].xsect.yFull;
+
+////  Added to release 5.1.010.  ////                                          //(5.1.010)
+    // --- treat a roadway weir as a special case
+    if ( Weir[k].type == ROADWAY_WEIR )
+        return roadway_getInflow(j, dir, hcrest, h1, h2);
+////
 
     // --- adjust crest ht. for partially open weir
     hcrest += (1.0 - Link[j].setting) * Link[j].xsect.yFull;
@@ -2247,9 +2321,11 @@ void weir_getFlow(int j, int k,  double head, double dir, int hasFlapGate,
     length = Link[j].xsect.wMax * UCF(LENGTH);
     h = head * UCF(LENGTH);
 
+////  Following code segment re-located.  ////                                 //(5.1.012)
     // --- reduce length when end contractions present
-    length -= 0.1 * Weir[k].endCon * h;
-    length = MAX(length, 0.0);
+    //length -= 0.1 * Weir[k].endCon * h;
+    //length = MAX(length, 0.0);
+/////////////////////////////////////////////
 
     // --- use appropriate formula for weir flow
     wType = Weir[k].type;
@@ -2258,15 +2334,28 @@ void weir_getFlow(int j, int k,  double head, double dir, int hasFlapGate,
     switch (wType)
     {
       case TRANSVERSE_WEIR:
+
+        // --- reduce length when end contractions present                     //(5.1.012)
+        length -= 0.1 * Weir[k].endCon * h;                                    //(5.1.012)
+        length = MAX(length, 0.0);                                             //(5.1.012)
         *q1 = Weir[k].cDisch1 * length * pow(h, 1.5);
         break;
 
       case SIDEFLOW_WEIR:
+
+        // --- reduce length when end contractions present                     //(5.1.012)
+        length -= 0.1 * Weir[k].endCon * h;                                    //(5.1.012)
+        length = MAX(length, 0.0);                                             //(5.1.012)
+
         // --- weir behaves as a transverse weir under reverse flow
         if ( dir < 0.0 )
             *q1 = Weir[k].cDisch1 * length * pow(h, 1.5);
         else
-            *q1 = Weir[k].cDisch1 * length * pow(h, 5./3.);
+
+////   Corrected formula  ////                                                 //(5.1.012)
+// (see Metcalf & Eddy, Inc., Wastewater Engineering, McGraw-Hill, 1972 p. 164).
+            *q1 = Weir[k].cDisch1 * pow(length, 0.83) * pow(h, 1.67);
+
         break;
 
       case VNOTCH_WEIR:
@@ -2276,8 +2365,11 @@ void weir_getFlow(int j, int k,  double head, double dir, int hasFlapGate,
       case TRAPEZOIDAL_WEIR:
         y = (1.0 - Link[j].setting) * Link[j].xsect.yFull;
         length = xsect_getWofY(&Link[j].xsect, y) * UCF(LENGTH);
-        length -= 0.1 * Weir[k].endCon * h;
-        length = MAX(length, 0.0);
+
+////  End contractions don't apply to trapezoidal weirs ////                   //(5.1.012)
+        //length -= 0.1 * Weir[k].endCon * h;                                  //(5.1.012)
+        //length = MAX(length, 0.0);                                           //(5.1.012)
+
         *q1 = Weir[k].cDisch1 * length * pow(h, 1.5);
         *q2 = Weir[k].cDisch2 * Weir[k].slope * pow(h, 2.5);
     }
@@ -2390,7 +2482,7 @@ double  weir_getdqdh(int k, double dir, double h, double q1, double q2)
       case SIDEFLOW_WEIR:
         // --- weir behaves as a transverse weir under reverse flow
         if ( dir < 0.0 ) return 1.5 * q1h;
-        else return 5./3. * q1h;
+        else return 1.67 * q1h;                                                //(5.1.012)
 
       case VNOTCH_WEIR:
         if ( q2h == 0.0 ) return 2.5 * q1h;  // Fully open
